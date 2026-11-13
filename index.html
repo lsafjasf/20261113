@@ -1,0 +1,3814 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#02070a">
+  <title>盲潮回响 · Blind Tide Echo</title>
+  <style>
+    :root {
+      --bg: #02070a;
+      --panel: rgba(3, 15, 20, 0.78);
+      --panel-strong: rgba(4, 20, 26, 0.94);
+      --line: rgba(108, 232, 225, 0.22);
+      --line-soft: rgba(108, 232, 225, 0.1);
+      --cyan: #72f1e7;
+      --cyan-soft: #3caab0;
+      --amber: #ffc875;
+      --green: #91f2b6;
+      --danger: #ff786d;
+      --ink: #e3fbf5;
+      --muted: #78979a;
+      --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", "Liberation Mono", Menlo, monospace;
+      --sans: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+      --serif: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      pointer-events: none;
+      opacity: 0.12;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 3px,
+        rgba(102, 230, 221, 0.035) 4px
+      );
+      mix-blend-mode: screen;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 1px solid rgba(114, 241, 231, 0.8);
+      outline-offset: 3px;
+    }
+
+    #game {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #ui {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .hidden {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    .hud {
+      position: absolute;
+      inset: 0;
+      opacity: 1;
+      transition: opacity 300ms ease, visibility 300ms ease;
+    }
+
+    .hud-top {
+      position: absolute;
+      top: max(22px, env(safe-area-inset-top));
+      left: max(26px, env(safe-area-inset-left));
+      right: max(80px, calc(env(safe-area-inset-right) + 80px));
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .mission-card,
+    .sonar-card,
+    .telemetry,
+    .beacon-card,
+    .guide-card {
+      position: relative;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, rgba(14, 43, 48, 0.48), transparent 50%),
+        var(--panel);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 18px 48px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(12px) saturate(0.8);
+      -webkit-backdrop-filter: blur(12px) saturate(0.8);
+    }
+
+    .mission-card {
+      min-width: 300px;
+      padding: 13px 16px 14px 18px;
+      clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 13px, 100% 100%, 0 100%);
+    }
+
+    .mission-card::before,
+    .sonar-card::before,
+    .telemetry::before,
+    .beacon-card::before,
+    .guide-card::before {
+      content: "";
+      position: absolute;
+      top: -1px;
+      left: 16px;
+      width: 42px;
+      height: 1px;
+      background: var(--cyan);
+      box-shadow: 0 0 12px rgba(114, 241, 231, 0.7);
+    }
+
+    .kicker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--cyan-soft);
+      font: 9px/1.2 var(--mono);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .kicker .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      animation: signal 2.2s ease-in-out infinite;
+    }
+
+    .objective {
+      margin-top: 8px;
+      font-size: 14px;
+      line-height: 1.35;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .objective b {
+      margin-left: 7px;
+      color: var(--amber);
+      font: 600 13px/1 var(--mono);
+      letter-spacing: 0.08em;
+    }
+
+    .objective .muted {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+    }
+
+    .sonar-card {
+      width: 256px;
+      padding: 13px 15px 12px;
+      margin-right: 48px;
+    }
+
+    .sonar-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .sonar-head span {
+      color: var(--muted);
+      font: 9px/1 var(--mono);
+      letter-spacing: 0.16em;
+    }
+
+    .sonar-head b {
+      color: var(--cyan);
+      font: 500 12px/1 var(--mono);
+      letter-spacing: 0.08em;
+    }
+
+    .pips {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 4px;
+      height: 17px;
+      align-items: end;
+      margin-top: 9px;
+    }
+
+    .pip {
+      height: 14px;
+      border: 1px solid rgba(114, 241, 231, 0.42);
+      background: rgba(114, 241, 231, 0.72);
+      box-shadow: 0 0 7px rgba(114, 241, 231, 0.28);
+      transform-origin: bottom;
+      transition: background 180ms ease, border-color 180ms ease, opacity 180ms ease;
+    }
+
+    .pip.spent {
+      border-color: rgba(109, 151, 151, 0.2);
+      background: rgba(82, 121, 122, 0.08);
+      box-shadow: none;
+      opacity: 0.72;
+    }
+
+    .pip.recharging {
+      animation: pipPulse 500ms ease;
+    }
+
+    .hud-bottom {
+      position: absolute;
+      left: max(26px, env(safe-area-inset-left));
+      right: max(26px, env(safe-area-inset-right));
+      bottom: max(22px, env(safe-area-inset-bottom));
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .telemetry {
+      width: 320px;
+      padding: 14px 16px 13px;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 13px), calc(100% - 13px) 100%, 0 100%);
+    }
+
+    .meter + .meter {
+      margin-top: 10px;
+    }
+
+    .meter-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font: 9px/1 var(--mono);
+      letter-spacing: 0.15em;
+    }
+
+    .meter-head b {
+      color: var(--ink);
+      font: 500 11px/1 var(--mono);
+      letter-spacing: 0.05em;
+    }
+
+    .track {
+      position: relative;
+      height: 4px;
+      background: rgba(116, 163, 164, 0.13);
+      overflow: hidden;
+    }
+
+    .track::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(90deg, transparent 0 30px, rgba(1, 8, 11, 0.85) 31px 33px);
+    }
+
+    .fill {
+      width: 100%;
+      height: 100%;
+      transform-origin: left;
+      transition: width 160ms linear, background 200ms ease;
+    }
+
+    #oxygenFill {
+      background: linear-gradient(90deg, #56d8d2, var(--cyan));
+      box-shadow: 0 0 12px rgba(114, 241, 231, 0.38);
+    }
+
+    #hullFill {
+      background: linear-gradient(90deg, #e3a962, var(--amber));
+      box-shadow: 0 0 12px rgba(255, 200, 117, 0.28);
+    }
+
+    .meter.low #oxygenFill {
+      background: linear-gradient(90deg, #ff766a, #ffb19b);
+      animation: lowPulse 1s ease-in-out infinite;
+    }
+
+    .meter.low .meter-head b {
+      color: var(--danger);
+    }
+
+    .sub-readout {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      margin-top: 11px;
+      padding-top: 9px;
+      border-top: 1px solid var(--line-soft);
+      color: var(--muted);
+      font: 9px/1 var(--mono);
+      letter-spacing: 0.08em;
+    }
+
+    .sub-readout b {
+      color: #a8cbca;
+      font-weight: 500;
+    }
+
+    .sub-readout .current {
+      margin-left: auto;
+      color: var(--cyan-soft);
+    }
+
+    .beacon-card {
+      width: 232px;
+      padding: 13px 16px 14px;
+      text-align: right;
+    }
+
+    .beacon-title {
+      color: var(--muted);
+      font: 9px/1 var(--mono);
+      letter-spacing: 0.16em;
+    }
+
+    .beacon-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 9px;
+    }
+
+    .beacon-slot {
+      position: relative;
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 200, 117, 0.3);
+      transform: rotate(45deg);
+      transition: border-color 250ms ease, background 250ms ease, box-shadow 250ms ease;
+    }
+
+    .beacon-slot::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      background: rgba(255, 200, 117, 0.12);
+      transition: background 250ms ease, box-shadow 250ms ease;
+    }
+
+    .beacon-slot.found {
+      border-color: rgba(255, 200, 117, 0.72);
+      background: rgba(255, 200, 117, 0.08);
+      box-shadow: 0 0 16px rgba(255, 200, 117, 0.16);
+    }
+
+    .beacon-slot.found::before {
+      background: var(--amber);
+      box-shadow: 0 0 10px var(--amber);
+    }
+
+    .beacon-count {
+      margin-left: 7px;
+      color: var(--amber);
+      font: 500 18px/1 var(--mono);
+      letter-spacing: 0.03em;
+    }
+
+    .beacon-sub {
+      margin-top: 10px;
+      color: var(--muted);
+      font: 9px/1.4 var(--mono);
+      letter-spacing: 0.07em;
+    }
+
+    .control-hint {
+      position: absolute;
+      left: 50%;
+      bottom: max(28px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      min-height: 31px;
+      padding: 7px 13px;
+      border: 1px solid rgba(102, 210, 206, 0.11);
+      background: rgba(2, 12, 16, 0.54);
+      color: rgba(163, 203, 202, 0.66);
+      font: 9px/1 var(--mono);
+      letter-spacing: 0.09em;
+      white-space: nowrap;
+      backdrop-filter: blur(6px);
+      transition: opacity 500ms ease;
+    }
+
+    .control-hint kbd {
+      margin-right: 4px;
+      padding: 2px 5px;
+      border: 1px solid rgba(114, 241, 231, 0.22);
+      color: rgba(190, 239, 234, 0.85);
+      font: inherit;
+    }
+
+    .guide-card {
+      position: absolute;
+      top: max(112px, calc(env(safe-area-inset-top) + 96px));
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 13px 8px 10px;
+      border-color: rgba(145, 242, 182, 0.25);
+      color: var(--green);
+      font: 10px/1 var(--mono);
+      letter-spacing: 0.1em;
+      transition: opacity 350ms ease, transform 350ms ease;
+    }
+
+    .guide-card::before {
+      background: var(--green);
+      box-shadow: 0 0 12px rgba(145, 242, 182, 0.7);
+    }
+
+    .guide-arrow {
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 10px solid var(--green);
+      filter: drop-shadow(0 0 4px rgba(145, 242, 182, 0.7));
+      transform-origin: 50% 55%;
+    }
+
+    .guide-card b {
+      font-weight: 500;
+      color: rgba(211, 255, 228, 0.75);
+    }
+
+    .toast {
+      position: absolute;
+      top: 28%;
+      left: 50%;
+      max-width: min(560px, calc(100vw - 48px));
+      padding: 10px 16px;
+      border-top: 1px solid rgba(114, 241, 231, 0.22);
+      border-bottom: 1px solid rgba(114, 241, 231, 0.12);
+      background: linear-gradient(90deg, transparent, rgba(1, 12, 16, 0.74) 15%, rgba(1, 12, 16, 0.74) 85%, transparent);
+      color: rgba(206, 248, 242, 0.92);
+      font-size: 12px;
+      line-height: 1.5;
+      letter-spacing: 0.08em;
+      text-align: center;
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity 220ms ease, transform 220ms ease;
+      white-space: nowrap;
+      text-shadow: 0 0 14px rgba(114, 241, 231, 0.3);
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .toast.alert {
+      color: #ffd4a3;
+      border-color: rgba(255, 200, 117, 0.26);
+    }
+
+    .toast.danger {
+      color: #ffc3bb;
+      border-color: rgba(255, 120, 109, 0.3);
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition: opacity 380ms ease, visibility 380ms ease;
+    }
+
+    .overlay.center {
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: radial-gradient(circle at 50% 50%, rgba(4, 17, 22, 0.3), rgba(1, 5, 7, 0.82));
+      backdrop-filter: blur(7px) saturate(0.7);
+      -webkit-backdrop-filter: blur(7px) saturate(0.7);
+    }
+
+    #menu {
+      align-items: center;
+      justify-content: flex-start;
+      padding: clamp(28px, 6vw, 90px);
+      background:
+        linear-gradient(90deg, rgba(1, 6, 9, 0.93) 0%, rgba(2, 9, 13, 0.72) 42%, rgba(2, 8, 11, 0.07) 75%),
+        radial-gradient(circle at 72% 55%, rgba(12, 78, 82, 0.08), transparent 40%);
+    }
+
+    .menu-card {
+      position: relative;
+      width: min(680px, 58vw);
+      padding: 2px 0;
+      animation: menuEnter 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .menu-card::before {
+      content: "";
+      position: absolute;
+      top: -31px;
+      left: -22px;
+      width: 1px;
+      height: 96px;
+      background: linear-gradient(to bottom, transparent, rgba(114, 241, 231, 0.5), transparent);
+    }
+
+    .menu-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--cyan-soft);
+      font: 9px/1.2 var(--mono);
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+    }
+
+    .menu-eyebrow::before {
+      content: "";
+      width: 34px;
+      height: 1px;
+      background: var(--cyan-soft);
+      box-shadow: 0 0 8px rgba(114, 241, 231, 0.35);
+    }
+
+    .title-wrap {
+      position: relative;
+      margin: 24px 0 0;
+    }
+
+    .title-echo {
+      position: absolute;
+      top: 48%;
+      left: -10px;
+      width: 96%;
+      height: 42%;
+      border-top: 1px solid rgba(114, 241, 231, 0.1);
+      border-bottom: 1px solid rgba(114, 241, 231, 0.06);
+      transform: translateY(-50%);
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    .game-title {
+      position: relative;
+      margin: 0;
+      color: #dffdf7;
+      font-family: var(--serif);
+      font-size: clamp(68px, 8.7vw, 126px);
+      font-weight: 500;
+      line-height: 0.92;
+      letter-spacing: 0.09em;
+      text-shadow:
+        0 0 30px rgba(64, 211, 207, 0.11),
+        0 18px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .game-title .thin {
+      color: rgba(189, 242, 235, 0.88);
+    }
+
+    @supports ((-webkit-text-stroke: 1px black) or (text-stroke: 1px black)) {
+      .game-title .thin {
+        color: transparent;
+        -webkit-text-stroke: 1px rgba(156, 236, 229, 0.62);
+        text-stroke: 1px rgba(156, 236, 229, 0.62);
+      }
+    }
+
+    .game-title .thin {
+      -webkit-text-stroke: 1px rgba(156, 236, 229, 0.62);
+      text-stroke: 1px rgba(156, 236, 229, 0.62);
+    }
+
+    .title-en {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-top: 16px;
+      color: rgba(124, 181, 183, 0.78);
+      font: 10px/1 var(--mono);
+      letter-spacing: 0.45em;
+    }
+
+    .title-en::after {
+      content: "";
+      flex: 1;
+      max-width: 185px;
+      height: 1px;
+      background: linear-gradient(90deg, rgba(114, 241, 231, 0.26), transparent);
+    }
+
+    .lede {
+      max-width: 550px;
+      margin: 31px 0 0;
+      color: rgba(184, 215, 214, 0.72);
+      font-size: 14px;
+      line-height: 1.95;
+      letter-spacing: 0.08em;
+    }
+
+    .lede em {
+      color: rgba(221, 251, 246, 0.94);
+      font-style: normal;
+    }
+
+    .seed-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      width: min(460px, 100%);
+      margin-top: 27px;
+    }
+
+    .seed-field {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .seed-field label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font: 8px/1 var(--mono);
+      letter-spacing: 0.2em;
+    }
+
+    .seed-input {
+      width: 100%;
+      height: 35px;
+      padding: 0 2px;
+      border: 0;
+      border-bottom: 1px solid rgba(114, 241, 231, 0.27);
+      border-radius: 0;
+      outline: none;
+      background: transparent;
+      color: var(--cyan);
+      font: 500 15px/1 var(--mono);
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .seed-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 8px 18px -13px rgba(114, 241, 231, 0.8);
+    }
+
+    .icon-button {
+      width: 36px;
+      height: 35px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(114, 241, 231, 0.19);
+      background: rgba(5, 22, 27, 0.4);
+      color: rgba(166, 223, 220, 0.78);
+      cursor: pointer;
+      transition: border-color 180ms ease, color 180ms ease, background 180ms ease;
+    }
+
+    .icon-button:hover {
+      border-color: rgba(114, 241, 231, 0.5);
+      background: rgba(17, 50, 55, 0.42);
+      color: var(--cyan);
+    }
+
+    .primary-button {
+      position: relative;
+      width: min(460px, 100%);
+      height: 55px;
+      margin-top: 18px;
+      padding: 0 20px 0 23px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      overflow: hidden;
+      border: 1px solid rgba(114, 241, 231, 0.45);
+      background:
+        linear-gradient(90deg, rgba(31, 122, 123, 0.33), rgba(10, 46, 51, 0.26)),
+        rgba(3, 17, 21, 0.7);
+      color: #e3fffa;
+      cursor: pointer;
+      font-size: 14px;
+      letter-spacing: 0.18em;
+      text-align: left;
+      box-shadow:
+        inset 0 0 30px rgba(72, 210, 205, 0.05),
+        0 0 0 rgba(114, 241, 231, 0);
+      transition: border-color 200ms ease, box-shadow 220ms ease, transform 220ms ease;
+    }
+
+    .primary-button::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -45%;
+      width: 35%;
+      background: linear-gradient(90deg, transparent, rgba(125, 246, 237, 0.14), transparent);
+      transform: skewX(-20deg);
+      transition: left 500ms ease;
+    }
+
+    .primary-button:hover {
+      border-color: rgba(150, 255, 246, 0.74);
+      box-shadow:
+        inset 0 0 38px rgba(72, 210, 205, 0.08),
+        0 0 25px rgba(65, 205, 198, 0.08);
+    }
+
+    .primary-button:hover::before {
+      left: 120%;
+    }
+
+    .primary-button:active {
+      transform: translateY(1px);
+    }
+
+    .primary-button kbd {
+      border: 1px solid rgba(114, 241, 231, 0.18);
+      padding: 4px 7px;
+      color: rgba(154, 205, 203, 0.7);
+      font: 8px/1 var(--mono);
+      letter-spacing: 0.12em;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(5, auto);
+      gap: 15px;
+      margin-top: 27px;
+      color: rgba(125, 160, 161, 0.72);
+      font: 9px/1 var(--mono);
+      letter-spacing: 0.05em;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .control-item kbd {
+      min-width: 25px;
+      padding: 5px 6px;
+      border: 1px solid rgba(114, 241, 231, 0.23);
+      color: rgba(198, 240, 236, 0.83);
+      font: 8px/1 var(--mono);
+      text-align: center;
+      letter-spacing: 0.07em;
+    }
+
+    .warning-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 22px;
+      color: rgba(255, 200, 117, 0.65);
+      font: 9px/1.4 var(--mono);
+      letter-spacing: 0.08em;
+    }
+
+    .warning-line::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border: 1px solid rgba(255, 200, 117, 0.55);
+      transform: rotate(45deg);
+    }
+
+    .menu-footer {
+      position: absolute;
+      left: clamp(28px, 6vw, 90px);
+      right: clamp(28px, 6vw, 90px);
+      bottom: 25px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: rgba(102, 137, 139, 0.6);
+      font: 8px/1 var(--mono);
+      letter-spacing: 0.16em;
+    }
+
+    .menu-footer .status-light {
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      margin-right: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 7px rgba(145, 242, 182, 0.7);
+    }
+
+    .modal-card {
+      position: relative;
+      width: min(500px, calc(100vw - 44px));
+      padding: 34px 36px 32px;
+      border: 1px solid rgba(114, 241, 231, 0.23);
+      background:
+        linear-gradient(145deg, rgba(19, 55, 61, 0.25), transparent 45%),
+        var(--panel-strong);
+      box-shadow:
+        0 35px 100px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.035);
+      clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+      animation: modalEnter 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .modal-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 36px;
+      width: 68px;
+      height: 1px;
+      background: var(--cyan);
+      box-shadow: 0 0 15px rgba(114, 241, 231, 0.72);
+    }
+
+    .modal-kicker {
+      color: var(--cyan-soft);
+      font: 8px/1 var(--mono);
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+
+    .modal-title {
+      margin: 14px 0 0;
+      font-family: var(--serif);
+      font-size: clamp(33px, 5vw, 48px);
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      line-height: 1.08;
+    }
+
+    .modal-copy {
+      margin: 15px 0 0;
+      color: rgba(180, 210, 210, 0.72);
+      font-size: 13px;
+      line-height: 1.8;
+      letter-spacing: 0.05em;
+    }
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 26px;
+    }
+
+    .modal-actions .wide {
+      grid-column: 1 / -1;
+    }
+
+    .action-button {
+      min-height: 44px;
+      padding: 0 14px;
+      border: 1px solid rgba(114, 241, 231, 0.26);
+      background: rgba(13, 42, 47, 0.33);
+      color: rgba(208, 243, 238, 0.88);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+    }
+
+    .action-button.primary {
+      border-color: rgba(114, 241, 231, 0.54);
+      background: rgba(31, 112, 113, 0.26);
+      color: #ecfffc;
+    }
+
+    .action-button:hover {
+      border-color: rgba(114, 241, 231, 0.68);
+      background: rgba(27, 78, 82, 0.43);
+      color: #fff;
+    }
+
+    .result-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      margin-top: 25px;
+      background: rgba(114, 241, 231, 0.12);
+      border: 1px solid rgba(114, 241, 231, 0.12);
+    }
+
+    .result-stat {
+      padding: 13px 10px 12px;
+      background: rgba(3, 16, 20, 0.9);
+      text-align: center;
+    }
+
+    .result-stat span {
+      display: block;
+      color: var(--muted);
+      font: 8px/1 var(--mono);
+      letter-spacing: 0.12em;
+    }
+
+    .result-stat b {
+      display: block;
+      margin-top: 7px;
+      color: var(--cyan);
+      font: 500 18px/1 var(--mono);
+      letter-spacing: 0.03em;
+    }
+
+    .result-seed {
+      margin-top: 16px;
+      color: rgba(106, 143, 144, 0.7);
+      font: 8px/1 var(--mono);
+      letter-spacing: 0.15em;
+      text-align: center;
+    }
+
+    #result.lost .modal-card::before {
+      background: var(--danger);
+      box-shadow: 0 0 15px rgba(255, 120, 109, 0.6);
+    }
+
+    #result.lost .modal-kicker,
+    #result.lost .result-stat b {
+      color: #ff9a8f;
+    }
+
+    #result.won .modal-card::before {
+      background: var(--green);
+      box-shadow: 0 0 15px rgba(145, 242, 182, 0.62);
+    }
+
+    #result.won .modal-kicker,
+    #result.won .result-stat b {
+      color: var(--green);
+    }
+
+    #muteBtn {
+      position: fixed;
+      top: max(23px, env(safe-area-inset-top));
+      right: max(26px, env(safe-area-inset-right));
+      z-index: 60;
+      width: 31px;
+      height: 31px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(114, 241, 231, 0.16);
+      background: rgba(2, 12, 16, 0.64);
+      color: rgba(152, 199, 198, 0.7);
+      cursor: pointer;
+      pointer-events: auto;
+      backdrop-filter: blur(6px);
+      transition: border-color 180ms ease, color 180ms ease;
+    }
+
+    #muteBtn:hover {
+      border-color: rgba(114, 241, 231, 0.4);
+      color: var(--cyan);
+    }
+
+    #muteBtn svg {
+      width: 15px;
+      height: 15px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    #muteBtn .slash {
+      display: none;
+    }
+
+    #muteBtn.muted .waves {
+      display: none;
+    }
+
+    #muteBtn.muted .slash {
+      display: block;
+      stroke: var(--danger);
+    }
+
+    @keyframes signal {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes lowPulse {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes pipPulse {
+      0% { transform: scaleY(0.35); opacity: 0.3; }
+      100% { transform: scaleY(1); opacity: 1; }
+    }
+
+    @keyframes menuEnter {
+      from { opacity: 0; transform: translateY(17px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes modalEnter {
+      from { opacity: 0; transform: translateY(12px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @media (max-width: 960px) {
+      #menu {
+        justify-content: center;
+        background:
+          linear-gradient(180deg, rgba(1, 6, 9, 0.72), rgba(1, 6, 9, 0.9)),
+          radial-gradient(circle at 60% 50%, rgba(12, 78, 82, 0.12), transparent 50%);
+      }
+
+      .menu-card {
+        width: min(650px, 91vw);
+      }
+
+      .game-title {
+        font-size: clamp(61px, 12vw, 100px);
+      }
+
+      .controls-grid {
+        grid-template-columns: repeat(3, auto);
+      }
+
+      .hud-top {
+        left: 18px;
+        right: 68px;
+      }
+
+      .mission-card {
+        min-width: 0;
+      }
+
+      .sonar-card {
+        width: 190px;
+        margin-right: 0;
+      }
+
+      .hud-bottom {
+        left: 18px;
+        right: 18px;
+      }
+
+      .telemetry {
+        width: 270px;
+      }
+
+      .beacon-card {
+        width: 190px;
+      }
+
+      .control-hint {
+        display: none;
+      }
+    }
+
+    @media (max-width: 680px) {
+      #menu {
+        padding: 26px 22px 70px;
+        align-items: center;
+      }
+
+      .menu-card {
+        width: 100%;
+      }
+
+      .menu-eyebrow {
+        font-size: 8px;
+      }
+
+      .game-title {
+        font-size: clamp(53px, 17vw, 82px);
+      }
+
+      .lede {
+        margin-top: 22px;
+        font-size: 12px;
+        line-height: 1.8;
+      }
+
+      .seed-row {
+        margin-top: 21px;
+      }
+
+      .controls-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 21px;
+      }
+
+      .warning-line {
+        margin-top: 17px;
+        font-size: 8px;
+      }
+
+      .menu-footer {
+        left: 22px;
+        right: 22px;
+        bottom: 16px;
+        font-size: 7px;
+      }
+
+      .menu-footer span:last-child {
+        display: none;
+      }
+
+      .hud-top {
+        top: 14px;
+        left: 12px;
+        right: 58px;
+        gap: 8px;
+      }
+
+      .mission-card {
+        padding: 10px 12px;
+      }
+
+      .kicker {
+        font-size: 7px;
+      }
+
+      .objective {
+        font-size: 11px;
+      }
+
+      .objective b {
+        font-size: 10px;
+      }
+
+      .sonar-card {
+        width: 146px;
+        padding: 10px 10px 9px;
+      }
+
+      .sonar-head span {
+        flex-shrink: 0;
+        font-size: 6.5px;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+      }
+
+      .sonar-head b {
+        flex-shrink: 0;
+        font-size: 8px;
+        white-space: nowrap;
+      }
+
+      .sonar-head {
+        gap: 4px;
+      }
+
+      .pips {
+        gap: 2px;
+        height: 13px;
+      }
+
+      .pip {
+        height: 10px;
+      }
+
+      .hud-bottom {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        gap: 8px;
+      }
+
+      .telemetry {
+        width: 218px;
+        padding: 11px 12px 10px;
+      }
+
+      .beacon-card {
+        width: 124px;
+        padding: 11px 12px;
+      }
+
+      .beacon-slot {
+        width: 20px;
+        height: 20px;
+      }
+
+      .beacon-count {
+        font-size: 14px;
+      }
+
+      .beacon-sub,
+      .sub-readout .current {
+        display: none;
+      }
+
+      .sub-readout {
+        gap: 8px;
+        font-size: 7px;
+      }
+
+      .guide-card {
+        top: 90px;
+      }
+
+      .modal-card {
+        padding: 28px 24px 25px;
+      }
+
+      .modal-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-actions .wide {
+        grid-column: auto;
+      }
+
+      .result-stats {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="盲潮回响游戏画面"></canvas>
+
+  <div id="ui">
+    <div id="hud" class="hud hidden" aria-hidden="true">
+      <div class="hud-top">
+        <div class="mission-card">
+          <div class="kicker"><span class="dot"></span><span>DIVE 07 / HADAL TRENCH</span></div>
+          <div class="objective" id="objectiveText">回收失联信标 <b>0 / 3</b></div>
+        </div>
+        <div class="sonar-card">
+          <div class="sonar-head">
+            <span>声呐脉冲 / SONAR</span>
+            <b id="sonarCount">09 / 12</b>
+          </div>
+          <div class="pips" id="sonarPips" aria-label="剩余声呐脉冲"></div>
+        </div>
+      </div>
+
+      <div class="guide-card hidden" id="extractionGuide">
+        <span class="guide-arrow" id="guideArrow"></span>
+        <span>撤离信标</span>
+        <b id="guideDistance">0 m</b>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="telemetry">
+          <div class="meter" id="oxygenMeter">
+            <div class="meter-head"><span>氧气储备 / O₂</span><b id="oxygenValue">100</b></div>
+            <div class="track"><div class="fill" id="oxygenFill"></div></div>
+          </div>
+          <div class="meter" id="hullMeter">
+            <div class="meter-head"><span>船体耐久 / HULL</span><b id="hullValue">100</b></div>
+            <div class="track"><div class="fill" id="hullFill"></div></div>
+          </div>
+          <div class="sub-readout">
+            <span>航速 <b id="speedValue">0</b> kn</span>
+            <span>深度 <b id="depthValue">2830</b> m</span>
+            <span class="current" id="currentValue">洋流平稳</span>
+          </div>
+        </div>
+
+        <div class="control-hint" id="controlHint">
+          <span><kbd>W</kbd>推进</span>
+          <span><kbd>S</kbd>制动</span>
+          <span><kbd>A D</kbd>转向</span>
+          <span><kbd>SHIFT</kbd>加速</span>
+          <span><kbd>SPACE</kbd>声呐</span>
+          <span><kbd>ESC</kbd>暂停</span>
+        </div>
+
+        <div class="beacon-card">
+          <div class="beacon-title">失联信标 / BEACONS</div>
+          <div class="beacon-row">
+            <span class="beacon-slot" data-slot="0"></span>
+            <span class="beacon-slot" data-slot="1"></span>
+            <span class="beacon-slot" data-slot="2"></span>
+            <span class="beacon-count" id="beaconCount">0/3</span>
+          </div>
+          <div class="beacon-sub">同一片海沟 · 同一次回响</div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast" role="status"></div>
+    </div>
+
+    <div class="overlay" id="menu">
+      <div class="menu-card">
+        <div class="menu-eyebrow">Deep sea recovery unit · DIVE 07</div>
+        <div class="title-wrap">
+          <div class="title-echo"></div>
+          <h1 class="game-title">盲潮<span class="thin">回响</span></h1>
+          <div class="title-en">BLIND TIDE ECHO</div>
+        </div>
+        <p class="lede">
+          三枚失联信标沉入无光海沟。这里没有灯，只有声音。<br>
+          发射声呐，让波前擦亮岩壁与生命的轮廓，在<em>短暂显形</em>的碎片里建立你的地图。
+        </p>
+
+        <div class="seed-row">
+          <div class="seed-field">
+            <label for="seedInput">固定种子 / FIXED SEED</label>
+            <input class="seed-input" id="seedInput" value="ABYSS-731" maxlength="24" spellcheck="false" autocomplete="off">
+          </div>
+          <button class="icon-button" id="seedShuffle" type="button" title="随机生成一个种子" aria-label="随机生成一个种子">↻</button>
+        </div>
+
+        <button class="primary-button" id="startBtn" type="button">
+          <span>开始下潜</span>
+          <kbd>ENTER</kbd>
+        </button>
+
+        <div class="controls-grid">
+          <span class="control-item"><kbd>W</kbd>推进</span>
+          <span class="control-item"><kbd>A D</kbd>转向</span>
+          <span class="control-item"><kbd>S</kbd>制动</span>
+          <span class="control-item"><kbd>SHIFT</kbd>加速</span>
+          <span class="control-item"><kbd>SPACE</kbd>声呐</span>
+        </div>
+        <div class="warning-line">声呐储量有限。氧气与船体一旦归零，本次下潜即告失败。</div>
+      </div>
+
+      <div class="menu-footer">
+        <span><i class="status-light"></i>DIVE SYSTEM ONLINE · LOCAL SIMULATION</span>
+        <span>相同 SEED · 相同海沟</span>
+      </div>
+    </div>
+
+    <div class="overlay center hidden" id="pause">
+      <div class="modal-card">
+        <div class="modal-kicker">DIVE SUSPENDED / 暂停</div>
+        <h2 class="modal-title">下潜暂停</h2>
+        <p class="modal-copy">声呐回响已冻结。你可以在黑暗中再想一遍路线，然后继续。</p>
+        <div class="result-stats">
+          <div class="result-stat"><span>信标</span><b id="pauseBeacons">0 / 3</b></div>
+          <div class="result-stat"><span>氧气</span><b id="pauseOxygen">100%</b></div>
+          <div class="result-stat"><span>船体</span><b id="pauseHull">100%</b></div>
+        </div>
+        <div class="modal-actions">
+          <button class="action-button primary wide" id="resumeBtn" type="button">继续下潜</button>
+          <button class="action-button" id="restartPause" type="button">重新开始</button>
+          <button class="action-button" id="menuPause" type="button">返回标题</button>
+        </div>
+        <div class="result-seed" id="pauseSeed">SEED // ABYSS-731</div>
+      </div>
+    </div>
+
+    <div class="overlay center hidden" id="result">
+      <div class="modal-card">
+        <div class="modal-kicker" id="resultKicker">DIVE COMPLETE</div>
+        <h2 class="modal-title" id="resultTitle">回响归航</h2>
+        <p class="modal-copy" id="resultReason">三枚信标已回收，潜航器安全返回撤离点。</p>
+        <div class="result-stats">
+          <div class="result-stat"><span>用时</span><b id="resultTime">00:00</b></div>
+          <div class="result-stat"><span>脉冲</span><b id="resultPulses">0</b></div>
+          <div class="result-stat"><span>船体</span><b id="resultHull">100%</b></div>
+        </div>
+        <div class="modal-actions">
+          <button class="action-button primary wide" id="retryBtn" type="button">再次下潜</button>
+          <button class="action-button" id="newSeedBtn" type="button">更换种子</button>
+          <button class="action-button" id="backMenuBtn" type="button">返回标题</button>
+        </div>
+        <div class="result-seed" id="resultSeed">SEED // ABYSS-731</div>
+      </div>
+    </div>
+
+    <button id="muteBtn" type="button" title="声音开关" aria-label="声音开关">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 9v6h4l5 4V5L8 9H4z"></path>
+        <g class="waves">
+          <path d="M16 8.5c1.2 1.6 1.2 5.4 0 7"></path>
+          <path d="M19 6c2.4 3 2.4 9 0 12"></path>
+        </g>
+        <path class="slash" d="M4 4l16 16"></path>
+      </svg>
+    </button>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const TAU = Math.PI * 2;
+      const DEFAULT_SEED = "ABYSS-731";
+      const WORLD_W = 3200;
+      const WORLD_H = 2100;
+      const SUB_RADIUS = 17;
+      const MAX_SONAR = 12;
+      const START_SONAR = 9;
+      const REVEAL_TIME = 7.6;
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d", { alpha: false });
+
+      const ui = {
+        hud: document.getElementById("hud"),
+        menu: document.getElementById("menu"),
+        pause: document.getElementById("pause"),
+        result: document.getElementById("result"),
+        seedInput: document.getElementById("seedInput"),
+        startBtn: document.getElementById("startBtn"),
+        seedShuffle: document.getElementById("seedShuffle"),
+        objectiveText: document.getElementById("objectiveText"),
+        sonarCount: document.getElementById("sonarCount"),
+        sonarPips: document.getElementById("sonarPips"),
+        oxygenMeter: document.getElementById("oxygenMeter"),
+        oxygenFill: document.getElementById("oxygenFill"),
+        oxygenValue: document.getElementById("oxygenValue"),
+        hullMeter: document.getElementById("hullMeter"),
+        hullFill: document.getElementById("hullFill"),
+        hullValue: document.getElementById("hullValue"),
+        speedValue: document.getElementById("speedValue"),
+        depthValue: document.getElementById("depthValue"),
+        currentValue: document.getElementById("currentValue"),
+        beaconSlots: Array.from(document.querySelectorAll(".beacon-slot")),
+        beaconCount: document.getElementById("beaconCount"),
+        controlHint: document.getElementById("controlHint"),
+        extractionGuide: document.getElementById("extractionGuide"),
+        guideArrow: document.getElementById("guideArrow"),
+        guideDistance: document.getElementById("guideDistance"),
+        toast: document.getElementById("toast"),
+        pauseBeacons: document.getElementById("pauseBeacons"),
+        pauseOxygen: document.getElementById("pauseOxygen"),
+        pauseHull: document.getElementById("pauseHull"),
+        pauseSeed: document.getElementById("pauseSeed"),
+        resumeBtn: document.getElementById("resumeBtn"),
+        restartPause: document.getElementById("restartPause"),
+        menuPause: document.getElementById("menuPause"),
+        resultKicker: document.getElementById("resultKicker"),
+        resultTitle: document.getElementById("resultTitle"),
+        resultReason: document.getElementById("resultReason"),
+        resultTime: document.getElementById("resultTime"),
+        resultPulses: document.getElementById("resultPulses"),
+        resultHull: document.getElementById("resultHull"),
+        resultSeed: document.getElementById("resultSeed"),
+        retryBtn: document.getElementById("retryBtn"),
+        newSeedBtn: document.getElementById("newSeedBtn"),
+        backMenuBtn: document.getElementById("backMenuBtn"),
+        muteBtn: document.getElementById("muteBtn")
+      };
+
+      let viewW = 1;
+      let viewH = 1;
+      let dpr = 1;
+      let backgroundGradient = null;
+      let vignetteGradient = null;
+      let noisePattern = null;
+
+      const keyState = new Set();
+      const game = {
+        state: "menu",
+        seed: DEFAULT_SEED,
+        world: null,
+        sub: null,
+        camera: { x: 0, y: 0 },
+        pulses: [],
+        particles: [],
+        sonarCharges: START_SONAR,
+        sonarCooldown: 0,
+        missionTime: 0,
+        visualTime: 0,
+        menuTime: 0,
+        shots: 0,
+        collisions: 0,
+        shake: 0,
+        hitFlash: 0,
+        slowFlash: 0,
+        currentX: 0,
+        currentY: 0,
+        currentMag: 0,
+        lowOxygenBeep: 0,
+        dockMessageCooldown: 0,
+        jellySoundCooldown: 0,
+        collisionSoundCooldown: 0,
+        toastTimer: 0,
+        extractionPulseTimer: 0,
+        resultKind: "",
+        resultReason: "",
+        endReason: "",
+        startedAt: 0
+      };
+
+      const menuDust = Array.from({ length: 120 }, (_, i) => ({
+        x: pseudoRandom(i * 12.91 + 0.1),
+        y: pseudoRandom(i * 7.31 + 2.7),
+        size: 0.3 + pseudoRandom(i * 3.77) * 1.45,
+        phase: pseudoRandom(i * 8.13) * TAU,
+        speed: 0.08 + pseudoRandom(i * 4.21) * 0.26
+      }));
+
+      const audio = {
+        ctx: null,
+        master: null,
+        compressor: null,
+        noiseBuffer: null,
+        muted: false,
+        ready: false
+      };
+
+      function pseudoRandom(n) {
+        const x = Math.sin(n * 127.1 + 311.7) * 43758.5453123;
+        return x - Math.floor(x);
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function smoothstep(edge0, edge1, value) {
+        const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
+      }
+
+      function hashSeed(input) {
+        let hash = 2166136261 >>> 0;
+        const text = String(input);
+        for (let i = 0; i < text.length; i++) {
+          hash ^= text.charCodeAt(i);
+          hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+      }
+
+      function makeRng(seed) {
+        let state = seed >>> 0;
+        return function rng() {
+          state = (state + 0x6d2b79f5) | 0;
+          let t = Math.imul(state ^ (state >>> 15), 1 | state);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function randomRange(rng, min, max) {
+        return min + (max - min) * rng();
+      }
+
+      function distance(x1, y1, x2, y2) {
+        return Math.hypot(x2 - x1, y2 - y1);
+      }
+
+      function seedHashLabel(seed) {
+        return hashSeed(seed).toString(16).toUpperCase().padStart(8, "0").slice(0, 4);
+      }
+
+      function formatTime(seconds) {
+        const safe = Math.max(0, Math.floor(seconds));
+        const mins = Math.floor(safe / 60);
+        const secs = safe % 60;
+        return String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+      }
+
+      function sanitizeSeed(value) {
+        const clean = String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 24);
+        return clean || DEFAULT_SEED;
+      }
+
+      function resize() {
+        viewW = Math.max(320, window.innerWidth);
+        viewH = Math.max(320, window.innerHeight);
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(viewW * dpr);
+        canvas.height = Math.floor(viewH * dpr);
+        canvas.style.width = viewW + "px";
+        canvas.style.height = viewH + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        backgroundGradient = ctx.createLinearGradient(0, 0, 0, viewH);
+        backgroundGradient.addColorStop(0, "#02070b");
+        backgroundGradient.addColorStop(0.45, "#031017");
+        backgroundGradient.addColorStop(1, "#010507");
+
+        const cx = viewW * 0.5;
+        const cy = viewH * 0.46;
+        const radius = Math.max(viewW, viewH) * 0.72;
+        vignetteGradient = ctx.createRadialGradient(cx, cy, radius * 0.22, cx, cy, radius);
+        vignetteGradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+        vignetteGradient.addColorStop(0.62, "rgba(0, 3, 5, 0.14)");
+        vignetteGradient.addColorStop(0.86, "rgba(0, 2, 4, 0.52)");
+        vignetteGradient.addColorStop(1, "rgba(0, 1, 3, 0.92)");
+
+        buildNoisePattern();
+      }
+
+      function buildNoisePattern() {
+        const noise = document.createElement("canvas");
+        noise.width = 160;
+        noise.height = 160;
+        const nctx = noise.getContext("2d");
+        const image = nctx.createImageData(noise.width, noise.height);
+        for (let i = 0; i < image.data.length; i += 4) {
+          const value = Math.random() * 255;
+          image.data[i] = value * 0.58;
+          image.data[i + 1] = value * 0.95;
+          image.data[i + 2] = value;
+          image.data[i + 3] = Math.random() * 45;
+        }
+        nctx.putImageData(image, 0, 0);
+        noisePattern = ctx.createPattern(noise, "repeat");
+      }
+
+      function buildRoute(start, end, rng, bend, segments) {
+        const points = [{ x: start.x, y: start.y }];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        const nx = -dy / length;
+        const ny = dx / length;
+        const phase = rng() * TAU;
+
+        for (let i = 1; i < segments; i++) {
+          const t = i / segments;
+          const sine = Math.sin(phase + t * 6.7) * 0.48;
+          const randomOffset = (rng() * 2 - 1) * 0.7;
+          const wave = Math.sin(t * Math.PI) * (sine + randomOffset) * bend;
+          points.push({
+            x: clamp(start.x + dx * t + nx * wave, 160, WORLD_W - 160),
+            y: clamp(start.y + dy * t + ny * wave, 160, WORLD_H - 160)
+          });
+        }
+
+        points.push({ x: end.x, y: end.y });
+        return points;
+      }
+
+      function pointSegmentDistanceSq(px, py, ax, ay, bx, by) {
+        const abx = bx - ax;
+        const aby = by - ay;
+        const lengthSq = abx * abx + aby * aby;
+        if (lengthSq < 0.0001) {
+          const dx = px - ax;
+          const dy = py - ay;
+          return dx * dx + dy * dy;
+        }
+        let t = ((px - ax) * abx + (py - ay) * aby) / lengthSq;
+        t = clamp(t, 0, 1);
+        const dx = px - (ax + abx * t);
+        const dy = py - (ay + aby * t);
+        return dx * dx + dy * dy;
+      }
+
+      function pathDistanceSq(x, y, routes) {
+        let minSq = Infinity;
+        for (let r = 0; r < routes.length; r++) {
+          const path = routes[r];
+          for (let i = 1; i < path.length; i++) {
+            const dSq = pointSegmentDistanceSq(x, y, path[i - 1].x, path[i - 1].y, path[i].x, path[i].y);
+            if (dSq < minSq) minSq = dSq;
+          }
+        }
+        return minSq;
+      }
+
+      function makeRock(rng, x, y, radius) {
+        const count = 9 + Math.floor(rng() * 7);
+        const scaleX = 0.76 + rng() * 0.65;
+        const scaleY = 0.69 + rng() * 0.7;
+        const rotation = rng() * TAU;
+        const points = [];
+        let maxRadius = 0;
+
+        for (let i = 0; i < count; i++) {
+          const angle = rotation + (i / count) * TAU + (rng() - 0.5) * 0.18;
+          const radial = radius * (0.72 + rng() * 0.38);
+          const px = x + Math.cos(angle) * radial * scaleX;
+          const py = y + Math.sin(angle) * radial * scaleY;
+          points.push({ x: px, y: py });
+          maxRadius = Math.max(maxRadius, distance(x, y, px, py));
+        }
+
+        const glints = Array.from({ length: 3 + Math.floor(rng() * 4) }, () => {
+          const angle = rng() * TAU;
+          const radial = radius * Math.sqrt(rng()) * 0.55;
+          return {
+            x: x + Math.cos(angle) * radial * scaleX,
+            y: y + Math.sin(angle) * radial * scaleY,
+            size: 0.6 + rng() * 1.8,
+            phase: rng() * TAU
+          };
+        });
+
+        return {
+          x,
+          y,
+          r: maxRadius,
+          drawRadius: radius,
+          points,
+          glints,
+          reveal: 0,
+          flash: 0
+        };
+      }
+
+      function generateWorld(rawSeed) {
+        const seed = sanitizeSeed(rawSeed);
+        const layoutRng = makeRng(hashSeed(seed + "::layout"));
+        const rockRng = makeRng(hashSeed(seed + "::rocks"));
+        const lifeRng = makeRng(hashSeed(seed + "::life"));
+        const currentRng = makeRng(hashSeed(seed + "::currents"));
+        const dustRng = makeRng(hashSeed(seed + "::dust"));
+
+        const start = { x: 390, y: 1080 };
+        const targets = [
+          {
+            x: clamp(2010 + randomRange(layoutRng, -125, 125), 1250, WORLD_W - 260),
+            y: clamp(475 + randomRange(layoutRng, -65, 65), 310, 760)
+          },
+          {
+            x: clamp(2835 + randomRange(layoutRng, -80, 80), 2520, WORLD_W - 220),
+            y: clamp(1090 + randomRange(layoutRng, -145, 145), 650, 1520)
+          },
+          {
+            x: clamp(1755 + randomRange(layoutRng, -105, 105), 1200, 2280),
+            y: clamp(1815 + randomRange(layoutRng, -65, 65), 1530, WORLD_H - 240)
+          }
+        ];
+
+        const routes = [
+          buildRoute(start, targets[0], layoutRng, 245, 5),
+          buildRoute(start, targets[1], layoutRng, 285, 5),
+          buildRoute(start, targets[2], layoutRng, 235, 5)
+        ];
+
+        const rocks = [];
+        const targetList = targets.concat([start]);
+        const corridorClearance = 132;
+
+        function canPlaceRock(x, y, radius) {
+          const pathDist = Math.sqrt(pathDistanceSq(x, y, routes));
+          if (pathDist < radius * 1.18 + corridorClearance) return false;
+          for (let i = 0; i < targetList.length; i++) {
+            if (distance(x, y, targetList[i].x, targetList[i].y) < radius + 158) return false;
+          }
+          return true;
+        }
+
+        let attempts = 0;
+        while (rocks.length < 172 && attempts < 680) {
+          attempts++;
+          const radius = 29 + Math.pow(rockRng(), 1.72) * 118;
+          const x = randomRange(rockRng, 95, WORLD_W - 95);
+          const y = randomRange(rockRng, 95, WORLD_H - 95);
+          if (!canPlaceRock(x, y, radius)) continue;
+
+          let overlaps = false;
+          for (let i = 0; i < rocks.length; i++) {
+            const other = rocks[i];
+            if (distance(x, y, other.x, other.y) < Math.max(28, (radius + other.drawRadius) * 0.38)) {
+              overlaps = true;
+              break;
+            }
+          }
+          if (overlaps) continue;
+          rocks.push(makeRock(rockRng, x, y, radius));
+        }
+
+        const beacons = targets.map((target, index) => ({
+          id: index + 1,
+          x: target.x,
+          y: target.y,
+          r: 44,
+          collected: false,
+          discovered: false,
+          reveal: 0,
+          flash: 0,
+          phase: lifeRng() * TAU,
+          label: "信标 0" + (index + 1)
+        }));
+
+        const jellies = [];
+        for (let i = 0; i < 24; i++) {
+          const route = routes[i % routes.length];
+          const segment = 1 + Math.floor(lifeRng() * (route.length - 2));
+          const a = route[segment];
+          const b = route[segment + 1];
+          const t = lifeRng();
+          const px = lerp(a.x, b.x, t);
+          const py = lerp(a.y, b.y, t);
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const length = Math.max(1, Math.hypot(dx, dy));
+          const side = lifeRng() > 0.5 ? 1 : -1;
+          const offset = randomRange(lifeRng, 35, 132) * side;
+          const x = clamp(px - (dy / length) * offset, 150, WORLD_W - 150);
+          const y = clamp(py + (dx / length) * offset, 150, WORLD_H - 150);
+          if (distance(x, y, start.x, start.y) < 210) continue;
+          jellies.push({
+            x,
+            y,
+            r: randomRange(lifeRng, 17, 31),
+            phase: lifeRng() * TAU,
+            bob: randomRange(lifeRng, 7, 24),
+            drift: randomRange(lifeRng, 9, 22),
+            reveal: 0,
+            flash: 0,
+            hue: lifeRng() > 0.72 ? "amber" : "violet"
+          });
+        }
+
+        const currents = [];
+        for (let i = 0; i < 6; i++) {
+          const route = routes[i % routes.length];
+          const point = route[1 + Math.floor(currentRng() * (route.length - 2))];
+          const angle = currentRng() * TAU;
+          currents.push({
+            x: clamp(point.x + randomRange(currentRng, -190, 190), 210, WORLD_W - 210),
+            y: clamp(point.y + randomRange(currentRng, -160, 160), 210, WORLD_H - 210),
+            r: randomRange(currentRng, 215, 365),
+            angle,
+            strength: randomRange(currentRng, 34, 72),
+            phase: currentRng() * TAU,
+            reveal: 0,
+            flash: 0
+          });
+        }
+
+        const motes = Array.from({ length: 420 }, () => ({
+          x: dustRng() * WORLD_W,
+          y: dustRng() * WORLD_H,
+          size: 0.35 + dustRng() * 1.65,
+          phase: dustRng() * TAU,
+          drift: 2 + dustRng() * 8,
+          alpha: 0.12 + dustRng() * 0.52
+        }));
+
+        const extraction = {
+          x: start.x,
+          y: start.y,
+          r: 64,
+          reveal: 1,
+          flash: 0.3,
+          phase: 0
+        };
+
+        return {
+          seed,
+          hash: hashSeed(seed),
+          w: WORLD_W,
+          h: WORLD_H,
+          start,
+          routes,
+          rocks,
+          beacons,
+          jellies,
+          currents,
+          motes,
+          extraction
+        };
+      }
+
+      function initSonarPips() {
+        ui.sonarPips.replaceChildren();
+        for (let i = 0; i < MAX_SONAR; i++) {
+          const pip = document.createElement("span");
+          pip.className = "pip";
+          ui.sonarPips.appendChild(pip);
+        }
+        refreshSonarPips();
+      }
+
+      function refreshSonarPips() {
+        const pips = ui.sonarPips.children;
+        for (let i = 0; i < pips.length; i++) {
+          pips[i].classList.toggle("spent", i >= game.sonarCharges);
+        }
+        ui.sonarCount.textContent = String(game.sonarCharges).padStart(2, "0") + " / " + MAX_SONAR;
+      }
+
+      function refreshStaticHud() {
+        const world = game.world;
+        const collected = world ? world.beacons.filter((b) => b.collected).length : 0;
+        if (collected >= 3) {
+          ui.objectiveText.innerHTML = "全部信标已回收 <span class=\"muted\">· 返回撤离点</span>";
+          ui.controlHint.innerHTML = "<span><kbd>绿色指引</kbd>撤离点方位</span><span><kbd>ESC</kbd>暂停</span>";
+        } else {
+          ui.objectiveText.innerHTML = "回收失联信标 <b>" + collected + " / 3</b>";
+          ui.controlHint.innerHTML = "<span><kbd>W</kbd>推进</span><span><kbd>S</kbd>制动</span><span><kbd>A D</kbd>转向</span><span><kbd>SHIFT</kbd>加速</span><span><kbd>SPACE</kbd>声呐</span><span><kbd>ESC</kbd>暂停</span>";
+        }
+        ui.beaconSlots.forEach((slot, index) => {
+          slot.classList.toggle("found", !!world && world.beacons[index] && world.beacons[index].collected);
+        });
+        if (world) {
+          ui.beaconCount.textContent = collected + "/3";
+        }
+      }
+
+      function updateLiveHud() {
+        const sub = game.sub;
+        if (!sub) return;
+        ui.oxygenFill.style.width = clamp(sub.oxygen, 0, 100) + "%";
+        ui.oxygenValue.textContent = Math.ceil(sub.oxygen);
+        ui.hullFill.style.width = clamp(sub.hull, 0, 100) + "%";
+        ui.hullValue.textContent = Math.ceil(sub.hull);
+        ui.oxygenMeter.classList.toggle("low", sub.oxygen < 24);
+        ui.hullMeter.classList.toggle("low", sub.hull < 28);
+        ui.speedValue.textContent = Math.round(Math.hypot(sub.vx, sub.vy) * 0.09);
+        ui.depthValue.textContent = Math.round(2830 + (sub.y - game.world.start.y) * 0.23);
+
+        if (game.currentMag > 4) {
+          ui.currentValue.textContent = "洋流 " + Math.round(game.currentMag * 0.55);
+        } else {
+          ui.currentValue.textContent = "洋流平稳";
+        }
+
+        const collected = game.world.beacons.filter((b) => b.collected).length;
+        if (collected >= 3) {
+          ui.extractionGuide.classList.remove("hidden");
+          const dx = game.world.extraction.x - sub.x;
+          const dy = game.world.extraction.y - sub.y;
+          const angle = Math.atan2(dy, dx);
+          ui.guideArrow.style.transform = "rotate(" + (angle + Math.PI / 2) + "rad)";
+          ui.guideDistance.textContent = Math.round(Math.hypot(dx, dy) / 10) + " m";
+        } else {
+          ui.extractionGuide.classList.add("hidden");
+        }
+      }
+
+      function showToast(message, kind = "", duration = 3000) {
+        window.clearTimeout(game.toastTimer);
+        ui.toast.textContent = message;
+        ui.toast.className = "toast visible" + (kind ? " " + kind : "");
+        game.toastTimer = window.setTimeout(() => {
+          ui.toast.classList.remove("visible");
+        }, duration);
+      }
+
+      function setHudActive(active) {
+        ui.hud.classList.toggle("hidden", !active);
+        ui.hud.setAttribute("aria-hidden", active ? "false" : "true");
+      }
+
+      function hideAllOverlays() {
+        ui.menu.classList.add("hidden");
+        ui.pause.classList.add("hidden");
+        ui.result.classList.add("hidden");
+      }
+
+      function showMenu() {
+        game.state = "menu";
+        game.menuTime = 0;
+        setHudActive(false);
+        hideAllOverlays();
+        ui.menu.classList.remove("hidden");
+        ui.seedInput.value = game.seed;
+        ui.result.classList.remove("won", "lost");
+        keyState.clear();
+      }
+
+      function beginMission(seedValue) {
+        ensureAudio();
+        game.seed = sanitizeSeed(seedValue || ui.seedInput.value);
+        ui.seedInput.value = game.seed;
+        game.world = generateWorld(game.seed);
+        game.pulses = [];
+        game.particles = [];
+        game.sonarCharges = START_SONAR;
+        game.sonarCooldown = 0;
+        game.missionTime = 0;
+        game.visualTime = 0;
+        game.shots = 0;
+        game.collisions = 0;
+        game.shake = 0;
+        game.hitFlash = 0;
+        game.slowFlash = 0;
+        game.currentX = 0;
+        game.currentY = 0;
+        game.currentMag = 0;
+        game.lowOxygenBeep = 8;
+        game.dockMessageCooldown = 6;
+        game.jellySoundCooldown = 0;
+        game.collisionSoundCooldown = 0;
+        game.extractionPulseTimer = 0;
+        game.resultKind = "";
+        game.resultReason = "";
+        game.endReason = "";
+        game.startedAt = performance.now();
+
+        const start = game.world.start;
+        game.sub = {
+          x: start.x,
+          y: start.y,
+          vx: 0,
+          vy: 0,
+          angle: 0,
+          radius: SUB_RADIUS,
+          oxygen: 100,
+          maxOxygen: 100,
+          hull: 100,
+          maxHull: 100,
+          slow: 0,
+          boosting: false,
+          throttle: 0,
+          trailTimer: 0,
+          motorPhase: 0
+        };
+        game.camera.x = start.x;
+        game.camera.y = start.y;
+
+        game.state = "playing";
+        hideAllOverlays();
+        setHudActive(true);
+        initSonarPips();
+        refreshStaticHud();
+        updateLiveHud();
+        keyState.clear();
+        spawnPulse({
+          x: start.x,
+          y: start.y,
+          maxR: 440,
+          speed: 510,
+          free: true,
+          color: "cyan",
+          reveal: true,
+          strength: 0.65
+        });
+        showToast("声呐阵列就绪 · 按 SPACE 发射脉冲", "", 3600);
+      }
+
+      function restartMission() {
+        beginMission(game.seed);
+      }
+
+      function pauseMission() {
+        if (game.state !== "playing") return;
+        game.state = "paused";
+        keyState.clear();
+        const collected = game.world.beacons.filter((b) => b.collected).length;
+        ui.pauseBeacons.textContent = collected + " / 3";
+        ui.pauseOxygen.textContent = Math.ceil(game.sub.oxygen) + "%";
+        ui.pauseHull.textContent = Math.ceil(game.sub.hull) + "%";
+        ui.pauseSeed.textContent = "SEED // " + game.seed + " · " + seedHashLabel(game.seed);
+        ui.pause.classList.remove("hidden");
+      }
+
+      function resumeMission() {
+        if (game.state !== "paused") return;
+        game.state = "playing";
+        ui.pause.classList.add("hidden");
+        keyState.clear();
+      }
+
+      function loseMission(reason, detail) {
+        if (game.state !== "playing") return;
+        game.state = "lost";
+        game.resultKind = "lost";
+        game.endReason = reason;
+        keyState.clear();
+        playFail();
+        showResult(false, detail || "海沟重新归于寂静。");
+      }
+
+      function winMission() {
+        if (game.state !== "playing") return;
+        game.state = "won";
+        game.resultKind = "won";
+        keyState.clear();
+        game.sub.vx *= 0.25;
+        game.sub.vy *= 0.25;
+        spawnBurst(game.world.extraction.x, game.world.extraction.y, "#91f2b6", 46, 170);
+        playWin();
+        showResult(true, "三枚信标已回收，潜航器安全返回撤离点。");
+      }
+
+      function showResult(win, reason) {
+        setHudActive(false);
+        ui.pause.classList.add("hidden");
+        ui.menu.classList.add("hidden");
+        ui.result.classList.remove("hidden", "won", "lost");
+        ui.result.classList.add(win ? "won" : "lost");
+        ui.resultKicker.textContent = win ? "DIVE COMPLETE / 回响归航" : "DIVE FAILED / 信号中断";
+        ui.resultTitle.textContent = win ? "回响归航" : (game.endReason === "hull" ? "船体失效" : "氧气耗尽");
+        ui.resultReason.textContent = win ? reason : (game.endReason === "hull"
+          ? "海沟岩壁击穿了耐压壳，最后的碰撞声沉入黑暗。"
+          : "呼吸储备归零，声呐阵列随之沉寂。");
+        ui.resultTime.textContent = formatTime(game.missionTime);
+        ui.resultPulses.textContent = String(game.shots);
+        ui.resultHull.textContent = Math.ceil(game.sub.hull) + "%";
+        ui.resultSeed.textContent = "SEED // " + game.seed + " · " + seedHashLabel(game.seed);
+      }
+
+      function getJellyPosition(jelly) {
+        return {
+          x: jelly.x + Math.sin(game.visualTime * 0.37 + jelly.phase) * jelly.drift,
+          y: jelly.y + Math.cos(game.visualTime * 0.32 + jelly.phase * 1.7) * jelly.bob
+        };
+      }
+
+      function currentAt(x, y) {
+        let fx = 0;
+        let fy = 0;
+        let mag = 0;
+        for (let i = 0; i < game.world.currents.length; i++) {
+          const current = game.world.currents[i];
+          const d = distance(x, y, current.x, current.y);
+          if (d < current.r) {
+            const falloff = 1 - d / current.r;
+            const amount = current.strength * falloff * falloff;
+            fx += Math.cos(current.angle) * amount;
+            fy += Math.sin(current.angle) * amount;
+            mag += amount;
+          }
+        }
+        return { x: fx, y: fy, mag };
+      }
+
+      function pointInPolygon(x, y, points) {
+        let inside = false;
+        for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+          const xi = points[i].x;
+          const yi = points[i].y;
+          const xj = points[j].x;
+          const yj = points[j].y;
+          if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+            inside = !inside;
+          }
+        }
+        return inside;
+      }
+
+      function circlePolygonCollision(cx, cy, radius, points) {
+        let closestX = 0;
+        let closestY = 0;
+        let bestDistSq = Infinity;
+        for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+          const ax = points[j].x;
+          const ay = points[j].y;
+          const bx = points[i].x;
+          const by = points[i].y;
+          const abx = bx - ax;
+          const aby = by - ay;
+          const lengthSq = abx * abx + aby * aby;
+          let t = lengthSq > 0.0001 ? ((cx - ax) * abx + (cy - ay) * aby) / lengthSq : 0;
+          t = clamp(t, 0, 1);
+          const px = ax + abx * t;
+          const py = ay + aby * t;
+          const dx = cx - px;
+          const dy = cy - py;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < bestDistSq) {
+            bestDistSq = dSq;
+            closestX = px;
+            closestY = py;
+          }
+        }
+
+        const inside = pointInPolygon(cx, cy, points);
+        const dist = Math.sqrt(bestDistSq);
+        if (!inside && dist >= radius) return null;
+
+        let nx;
+        let ny;
+        if (dist > 0.0001) {
+          nx = (cx - closestX) / dist;
+          ny = (cy - closestY) / dist;
+          if (inside) {
+            nx = -nx;
+            ny = -ny;
+          }
+        } else {
+          nx = 1;
+          ny = 0;
+        }
+
+        return {
+          nx,
+          ny,
+          penetration: inside ? dist + radius + 0.1 : radius - dist + 0.1,
+          x: closestX,
+          y: closestY,
+          inside
+        };
+      }
+
+      function resolveSubCollisions() {
+        const sub = game.sub;
+        let maxImpact = 0;
+        let hitPoint = null;
+        let hitRock = null;
+
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 0; i < game.world.rocks.length; i++) {
+            const rock = game.world.rocks[i];
+            if (distance(sub.x, sub.y, rock.x, rock.y) > rock.r + sub.radius + 6) continue;
+            const hit = circlePolygonCollision(sub.x, sub.y, sub.radius, rock.points);
+            if (!hit) continue;
+            sub.x += hit.nx * hit.penetration;
+            sub.y += hit.ny * hit.penetration;
+            const vn = sub.vx * hit.nx + sub.vy * hit.ny;
+            if (vn < 0) {
+              const impact = -vn;
+              if (impact > maxImpact) {
+                maxImpact = impact;
+                hitPoint = { x: hit.x, y: hit.y };
+                hitRock = rock;
+              }
+              const restitution = 0.56;
+              sub.vx -= (1 + restitution) * vn * hit.nx;
+              sub.vy -= (1 + restitution) * vn * hit.ny;
+            }
+          }
+        }
+
+        const margin = 67;
+        const boundaryHits = [
+          { side: "left", hit: sub.x < margin, normalX: 1, normalY: 0, penetration: margin - sub.x },
+          { side: "right", hit: sub.x > WORLD_W - margin, normalX: -1, normalY: 0, penetration: sub.x - (WORLD_W - margin) },
+          { side: "top", hit: sub.y < margin, normalX: 0, normalY: 1, penetration: margin - sub.y },
+          { side: "bottom", hit: sub.y > WORLD_H - margin, normalX: 0, normalY: -1, penetration: sub.y - (WORLD_H - margin) }
+        ];
+
+        for (let i = 0; i < boundaryHits.length; i++) {
+          const boundary = boundaryHits[i];
+          if (!boundary.hit) continue;
+          sub.x += boundary.normalX * boundary.penetration;
+          sub.y += boundary.normalY * boundary.penetration;
+          const vn = sub.vx * boundary.normalX + sub.vy * boundary.normalY;
+          if (vn < 0) {
+            maxImpact = Math.max(maxImpact, -vn);
+            sub.vx -= 1.5 * vn * boundary.normalX;
+            sub.vy -= 1.5 * vn * boundary.normalY;
+          }
+        }
+
+        if (maxImpact > 48) {
+          const damage = Math.min(28, (maxImpact - 42) * 0.115);
+          sub.hull = Math.max(0, sub.hull - damage);
+          game.collisions++;
+          game.shake = Math.max(game.shake, Math.min(17, 3 + maxImpact * 0.045));
+          game.hitFlash = Math.max(game.hitFlash, Math.min(0.34, damage * 0.02));
+          if (hitPoint) {
+            spawnBurst(hitPoint.x, hitPoint.y, "#ffc875", 10 + Math.floor(damage), 75 + maxImpact * 0.25);
+          }
+          if (game.collisionSoundCooldown <= 0) {
+            playCollision(Math.min(1, maxImpact / 220));
+            game.collisionSoundCooldown = 0.17;
+          }
+          if (maxImpact > 125 && hitRock) {
+            game.shake = Math.max(game.shake, 13);
+          }
+        }
+      }
+
+      function spawnPulse(options = {}) {
+        const pulse = {
+          x: options.x !== undefined ? options.x : game.sub.x,
+          y: options.y !== undefined ? options.y : game.sub.y,
+          r: 8,
+          maxR: options.maxR || 1110,
+          speed: options.speed || 690,
+          color: options.color || "cyan",
+          free: !!options.free,
+          reveal: options.reveal !== false,
+          strength: options.strength || 1,
+          age: 0
+        };
+        game.pulses.push(pulse);
+        if (pulse.reveal) {
+          revealNearPulse(pulse, 0, 16);
+        }
+        return pulse;
+      }
+
+      function emitSonar() {
+        if (game.state !== "playing" || !game.sub) return;
+        if (game.sonarCooldown > 0) return;
+        if (game.sonarCharges <= 0) {
+          showToast("声呐储能耗尽 · 依靠记忆与信标微光继续航行", "danger", 2600);
+          playDenied();
+          game.sonarCooldown = 0.7;
+          return;
+        }
+        game.sonarCharges--;
+        game.shots++;
+        game.sonarCooldown = 0.46;
+        refreshSonarPips();
+        spawnPulse({
+          x: game.sub.x,
+          y: game.sub.y,
+          maxR: 1120,
+          speed: 710,
+          color: "cyan",
+          free: false,
+          reveal: true,
+          strength: 1
+        });
+        game.shake = Math.max(game.shake, 1.4);
+        playSonar();
+      }
+
+      function waveHitsObject(pulse, obj, previousRadius) {
+        const d = distance(pulse.x, pulse.y, obj.x, obj.y);
+        const objectRadius = obj.r || 18;
+        return pulse.r + objectRadius >= d && previousRadius - objectRadius <= d;
+      }
+
+      function revealObject(obj, strength) {
+        obj.reveal = Math.max(obj.reveal || 0, clamp(strength, 0.2, 1));
+        obj.flash = Math.max(obj.flash || 0, clamp(strength, 0.25, 1));
+      }
+
+      function revealNearPulse(pulse, previousRadius, currentRadius) {
+        const world = game.world;
+        if (!world) return;
+
+        for (let i = 0; i < world.rocks.length; i++) {
+          const rock = world.rocks[i];
+          if (waveHitsObject({ ...pulse, r: currentRadius }, rock, previousRadius)) {
+            revealObject(rock, 0.92);
+          }
+        }
+
+        for (let i = 0; i < world.jellies.length; i++) {
+          const jelly = world.jellies[i];
+          const pos = getJellyPosition(jelly);
+          if (waveHitsObject({ ...pulse, r: currentRadius }, { x: pos.x, y: pos.y, r: jelly.r + 10 }, previousRadius)) {
+            revealObject(jelly, 0.95);
+          }
+        }
+
+        for (let i = 0; i < world.currents.length; i++) {
+          const current = world.currents[i];
+          if (waveHitsObject({ ...pulse, r: currentRadius }, { x: current.x, y: current.y, r: 8 }, previousRadius)) {
+            revealObject(current, 0.52);
+          }
+        }
+
+        for (let i = 0; i < world.beacons.length; i++) {
+          const beacon = world.beacons[i];
+          if (!beacon.collected && waveHitsObject({ ...pulse, r: currentRadius }, beacon, previousRadius)) {
+            revealObject(beacon, 1);
+            if (!beacon.discovered) {
+              beacon.discovered = true;
+              playDiscover();
+              showToast("声呐捕获 " + beacon.label + " 回响 · 位置仅短暂显形", "alert", 3000);
+            }
+          }
+        }
+
+        if (waveHitsObject({ ...pulse, r: currentRadius }, world.extraction, previousRadius)) {
+          revealObject(world.extraction, 0.9);
+        }
+      }
+
+      function updatePulse(pulse, dt) {
+        const previous = pulse.r;
+        pulse.age += dt;
+        pulse.r += pulse.speed * dt;
+        if (pulse.reveal) {
+          revealNearPulse(pulse, previous, pulse.r);
+        }
+      }
+
+      function spawnParticle(particle) {
+        if (game.particles.length > 450) game.particles.shift();
+        game.particles.push(particle);
+      }
+
+      function spawnBurst(x, y, color, count, speed) {
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * TAU;
+          const velocity = speed * (0.2 + Math.random() * 0.8);
+          spawnParticle({
+            x,
+            y,
+            vx: Math.cos(angle) * velocity,
+            vy: Math.sin(angle) * velocity,
+            life: 0.55 + Math.random() * 1.35,
+            maxLife: 1.9,
+            size: 0.7 + Math.random() * 2.2,
+            color,
+            drag: 1.7,
+            glow: true
+          });
+        }
+      }
+
+      function spawnTrail(dt) {
+        const sub = game.sub;
+        const speed = Math.hypot(sub.vx, sub.vy);
+        if (speed < 12) return;
+        sub.trailTimer -= dt;
+        if (sub.trailTimer > 0) return;
+        sub.trailTimer = sub.boosting ? 0.025 : 0.07;
+        const backX = sub.x - Math.cos(sub.angle) * 24;
+        const backY = sub.y - Math.sin(sub.angle) * 24;
+        const spread = (Math.random() - 0.5) * 11;
+        spawnParticle({
+          x: backX + Math.cos(sub.angle + Math.PI / 2) * spread,
+          y: backY + Math.sin(sub.angle + Math.PI / 2) * spread,
+          vx: -Math.cos(sub.angle) * (18 + Math.random() * 28) + sub.vx * 0.1,
+          vy: -Math.sin(sub.angle) * (18 + Math.random() * 28) + sub.vy * 0.1,
+          life: 0.7 + Math.random() * 0.8,
+          maxLife: 1.5,
+          size: 0.7 + Math.random() * 2.1,
+          color: sub.boosting ? "#ffc875" : "#72f1e7",
+          drag: 0.8,
+          bubble: true
+        });
+      }
+
+      function collectBeacon(beacon) {
+        if (beacon.collected) return;
+        beacon.collected = true;
+        beacon.reveal = 1;
+        beacon.flash = 1;
+        game.sonarCharges = Math.min(MAX_SONAR, game.sonarCharges + 1);
+        game.sub.oxygen = Math.min(game.sub.maxOxygen, game.sub.oxygen + 16);
+        refreshSonarPips();
+        const collected = game.world.beacons.filter((b) => b.collected).length;
+        refreshStaticHud();
+        spawnBurst(beacon.x, beacon.y, "#ffc875", 34, 145);
+        playCollect();
+        showToast(beacon.label + " 已回收 · 声呐 +1 · 氧气 +16", "alert", 3000);
+
+        if (collected >= 3) {
+          game.extractionPulseTimer = 0;
+          game.world.extraction.reveal = 1;
+          game.world.extraction.flash = 1;
+          showToast("三枚信标全部回收 · 撤离信标已启动", "alert", 4200);
+          window.setTimeout(() => {
+            if (game.state === "playing") playExtractionReady();
+          }, 450);
+        }
+      }
+
+      function tryDock() {
+        const sub = game.sub;
+        const dock = game.world.extraction;
+        const collected = game.world.beacons.filter((b) => b.collected).length;
+        const d = distance(sub.x, sub.y, dock.x, dock.y);
+        if (d < dock.r + sub.radius * 0.5) {
+          if (collected >= 3) {
+            winMission();
+          } else if (game.dockMessageCooldown <= 0) {
+            game.dockMessageCooldown = 4;
+            showToast("撤离点已锁定 · 仍需回收 " + (3 - collected) + " 枚信标", "", 2400);
+            playDockTick();
+          }
+        }
+      }
+
+      function checkJellyCollisions() {
+        const sub = game.sub;
+        for (let i = 0; i < game.world.jellies.length; i++) {
+          const jelly = game.world.jellies[i];
+          const pos = getJellyPosition(jelly);
+          const d = distance(sub.x, sub.y, pos.x, pos.y);
+          if (d < jelly.r + sub.radius + 10) {
+            sub.slow = Math.max(sub.slow, 2.6);
+            sub.vx *= 0.985;
+            sub.vy *= 0.985;
+            game.slowFlash = Math.max(game.slowFlash, 0.22);
+            if (game.jellySoundCooldown <= 0) {
+              playJelly();
+              game.jellySoundCooldown = 1.35;
+              spawnBurst(pos.x, pos.y, jelly.hue === "amber" ? "#ffc875" : "#c79bff", 5, 36);
+              showToast("水母群阻滞推进 · 航速暂时下降", "", 1900);
+            }
+            break;
+          }
+        }
+      }
+
+      function updateSub(dt) {
+        const sub = game.sub;
+        const boostKey = keyState.has("ShiftLeft") || keyState.has("ShiftRight");
+        const forward = keyState.has("KeyW") || keyState.has("ArrowUp");
+        const backward = keyState.has("KeyS") || keyState.has("ArrowDown");
+        const left = keyState.has("KeyA") || keyState.has("ArrowLeft");
+        const right = keyState.has("KeyD") || keyState.has("ArrowRight");
+        const turn = (right ? 1 : 0) - (left ? 1 : 0);
+        const slowed = sub.slow > 0;
+
+        sub.slow = Math.max(0, sub.slow - dt);
+        sub.boosting = !!boostKey && forward && sub.oxygen > 0.5 && !slowed;
+        sub.throttle = forward ? 1 : backward ? -1 : 0;
+        sub.motorPhase += dt * (1.5 + Math.hypot(sub.vx, sub.vy) * 0.045);
+
+        const turnRate = slowed ? 1.52 : 2.17;
+        sub.angle += turn * turnRate * dt;
+        sub.angle = (sub.angle + TAU) % TAU;
+
+        let acceleration = 0;
+        if (forward) {
+          acceleration = slowed ? 112 : (sub.boosting ? 395 : 206);
+          if (sub.boosting) {
+            sub.oxygen = Math.max(0, sub.oxygen - dt * 1.65);
+          }
+        } else if (backward) {
+          const speedAlong = sub.vx * Math.cos(sub.angle) + sub.vy * Math.sin(sub.angle);
+          acceleration = speedAlong > 30 ? -285 : -128;
+        }
+
+        sub.vx += Math.cos(sub.angle) * acceleration * dt;
+        sub.vy += Math.sin(sub.angle) * acceleration * dt;
+
+        const current = currentAt(sub.x, sub.y);
+        game.currentX = current.x;
+        game.currentY = current.y;
+        game.currentMag = current.mag;
+        sub.vx += current.x * dt;
+        sub.vy += current.y * dt;
+
+        const drag = slowed ? 1.18 : 0.53;
+        const dragFactor = Math.exp(-drag * dt);
+        sub.vx *= dragFactor;
+        sub.vy *= dragFactor;
+
+        const speed = Math.hypot(sub.vx, sub.vy);
+        const speedCap = slowed ? 142 : (sub.boosting ? 348 : 246);
+        if (speed > speedCap) {
+          const ratio = speedCap / speed;
+          sub.vx *= ratio;
+          sub.vy *= ratio;
+        }
+
+        if (!forward && !backward) {
+          const brake = Math.exp(-0.44 * dt);
+          sub.vx *= brake;
+          sub.vy *= brake;
+        }
+
+        sub.x += sub.vx * dt;
+        sub.y += sub.vy * dt;
+        resolveSubCollisions();
+        checkJellyCollisions();
+
+        for (let i = 0; i < game.world.beacons.length; i++) {
+          const beacon = game.world.beacons[i];
+          if (!beacon.collected && distance(sub.x, sub.y, beacon.x, beacon.y) < beacon.r + sub.radius) {
+            collectBeacon(beacon);
+          }
+        }
+        tryDock();
+
+        const oxygenDrain = dt * (0.315 + (sub.boosting ? 0.95 : 0) + (speed > 5 ? 0.018 : 0));
+        sub.oxygen = Math.max(0, sub.oxygen - oxygenDrain);
+        spawnTrail(dt);
+
+        if (sub.oxygen <= 0) {
+          loseMission("oxygen");
+        } else if (sub.hull <= 0) {
+          loseMission("hull");
+        }
+
+        if (sub.oxygen < 22) {
+          game.lowOxygenBeep -= dt;
+          if (game.lowOxygenBeep <= 0) {
+            game.lowOxygenBeep = 7.5;
+            playLowOxygen();
+          }
+        } else {
+          game.lowOxygenBeep = 7.5;
+        }
+      }
+
+      function updateReveals(dt) {
+        const world = game.world;
+        if (!world) return;
+        const fade = dt / REVEAL_TIME;
+        const flashFade = dt * 1.8;
+        const objects = world.rocks.concat(world.jellies, world.currents, world.beacons, [world.extraction]);
+        for (let i = 0; i < objects.length; i++) {
+          const obj = objects[i];
+          obj.reveal = Math.max(0, (obj.reveal || 0) - fade);
+          obj.flash = Math.max(0, (obj.flash || 0) - flashFade);
+        }
+      }
+
+      function updateParticles(dt) {
+        for (let i = game.particles.length - 1; i >= 0; i--) {
+          const p = game.particles[i];
+          p.life -= dt;
+          if (p.life <= 0) {
+            game.particles.splice(i, 1);
+            continue;
+          }
+          p.vx *= Math.exp(-p.drag * dt);
+          p.vy *= Math.exp(-p.drag * dt);
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          if (p.bubble) p.vx += Math.sin(game.visualTime * 2 + p.x * 0.01) * 3 * dt;
+        }
+      }
+
+      function updateCamera(dt) {
+        const sub = game.sub;
+        const targetX = sub.x + sub.vx * 0.22;
+        const targetY = sub.y + sub.vy * 0.18;
+        const smoothing = 1 - Math.exp(-3.7 * dt);
+        game.camera.x = lerp(game.camera.x, targetX, smoothing);
+        game.camera.y = lerp(game.camera.y, targetY, smoothing);
+
+        const halfW = viewW * 0.5;
+        const halfH = viewH * 0.5;
+        if (viewW < WORLD_W) {
+          game.camera.x = clamp(game.camera.x, halfW - 30, WORLD_W - halfW + 30);
+        } else {
+          game.camera.x = WORLD_W * 0.5;
+        }
+        if (viewH < WORLD_H) {
+          game.camera.y = clamp(game.camera.y, halfH - 30, WORLD_H - halfH + 30);
+        } else {
+          game.camera.y = WORLD_H * 0.5;
+        }
+      }
+
+      function updateExtractionGuidance(dt) {
+        const collected = game.world.beacons.filter((b) => b.collected).length;
+        if (collected < 3 || game.state !== "playing") return;
+        game.extractionPulseTimer -= dt;
+        if (game.extractionPulseTimer <= 0) {
+          game.extractionPulseTimer = 9.5;
+          spawnPulse({
+            x: game.world.extraction.x,
+            y: game.world.extraction.y,
+            maxR: 1260,
+            speed: 510,
+            free: true,
+            color: "green",
+            reveal: false,
+            strength: 0.3
+          });
+        }
+      }
+
+      function updateGame(dt) {
+        if (game.state !== "playing") return;
+        game.missionTime += dt;
+        game.visualTime += dt;
+        game.sonarCooldown = Math.max(0, game.sonarCooldown - dt);
+        game.hitFlash = Math.max(0, game.hitFlash - dt * 1.9);
+        game.slowFlash = Math.max(0, game.slowFlash - dt * 2.2);
+        game.shake = Math.max(0, game.shake - dt * 26);
+        game.dockMessageCooldown = Math.max(0, game.dockMessageCooldown - dt);
+        game.jellySoundCooldown = Math.max(0, game.jellySoundCooldown - dt);
+        game.collisionSoundCooldown = Math.max(0, game.collisionSoundCooldown - dt);
+
+        updateSub(dt);
+        updatePulses(dt);
+        updateReveals(dt);
+        updateParticles(dt);
+        updateCamera(dt);
+        updateExtractionGuidance(dt);
+        updateLiveHud();
+      }
+
+      function updatePulses(dt) {
+        for (let i = game.pulses.length - 1; i >= 0; i--) {
+          const pulse = game.pulses[i];
+          updatePulse(pulse, dt);
+          if (pulse.r >= pulse.maxR + 60) game.pulses.splice(i, 1);
+        }
+      }
+
+      function drawWorldMotes(left, top, right, bottom) {
+        ctx.save();
+        for (let i = 0; i < game.world.motes.length; i++) {
+          const mote = game.world.motes[i];
+          if (mote.x < left || mote.x > right || mote.y < top || mote.y > bottom) continue;
+          const pulse = 0.62 + Math.sin(game.visualTime * 0.55 + mote.phase) * 0.38;
+          const driftX = Math.sin(game.visualTime * 0.13 + mote.phase) * mote.drift;
+          const driftY = Math.cos(game.visualTime * 0.1 + mote.phase * 1.2) * mote.drift * 0.5;
+          ctx.globalAlpha = mote.alpha * pulse;
+          ctx.fillStyle = "#a8ddd8";
+          ctx.beginPath();
+          ctx.arc(mote.x + driftX, mote.y + driftY, mote.size, 0, TAU);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawCurrents(left, top, right, bottom) {
+        for (let i = 0; i < game.world.currents.length; i++) {
+          const current = game.world.currents[i];
+          if (current.reveal <= 0.01) continue;
+          if (current.x + current.r < left || current.x - current.r > right ||
+              current.y + current.r < top || current.y - current.r > bottom) continue;
+          const alpha = current.reveal * (0.48 + current.flash * 0.4);
+          ctx.save();
+          ctx.translate(current.x, current.y);
+          ctx.rotate(current.angle);
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = alpha * 0.68;
+          ctx.strokeStyle = "rgba(87, 206, 211, 0.54)";
+          ctx.lineWidth = 0.85;
+          ctx.setLineDash([13, 22]);
+          ctx.lineDashOffset = -game.visualTime * current.strength * 0.8 - current.phase * 20;
+          for (let k = -1; k <= 1; k++) {
+            ctx.beginPath();
+            const y = k * current.r * 0.27;
+            const reach = current.r * 0.58;
+            ctx.moveTo(-reach, y);
+            ctx.bezierCurveTo(-current.r * 0.2, y + Math.sin(k * 2.2 + current.phase) * 15, current.r * 0.18, y - 14, reach, y);
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+      }
+
+      function drawRocks(left, top, right, bottom) {
+        for (let i = 0; i < game.world.rocks.length; i++) {
+          const rock = game.world.rocks[i];
+          if (rock.reveal <= 0.012) continue;
+          if (rock.x + rock.r < left || rock.x - rock.r > right ||
+              rock.y + rock.r < top || rock.y - rock.r > bottom) continue;
+          const alpha = rock.reveal;
+          const flash = rock.flash;
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(rock.points[0].x, rock.points[0].y);
+          for (let j = 1; j < rock.points.length; j++) {
+            ctx.lineTo(rock.points[j].x, rock.points[j].y);
+          }
+          ctx.closePath();
+          ctx.fillStyle = "rgba(3, 17, 22, " + (0.82 * alpha) + ")";
+          ctx.fill();
+
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = alpha * (0.12 + flash * 0.16);
+          ctx.strokeStyle = "rgba(94, 242, 233, 0.78)";
+          ctx.lineWidth = 4.5 + flash * 3;
+          ctx.stroke();
+
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = "rgba(95, 221, 216, " + (alpha * (0.42 + flash * 0.5)) + ")";
+          ctx.lineWidth = 1.15 + flash * 0.7;
+          ctx.stroke();
+
+          ctx.globalAlpha = alpha * (0.34 + flash * 0.28);
+          ctx.strokeStyle = "rgba(94, 203, 201, 0.65)";
+          ctx.lineWidth = 0.7;
+          ctx.setLineDash([4, 7]);
+          for (let s = 0.48; s <= 0.76; s += 0.14) {
+            ctx.beginPath();
+            for (let j = 0; j < rock.points.length; j++) {
+              const x = rock.x + (rock.points[j].x - rock.x) * s;
+              const y = rock.y + (rock.points[j].y - rock.y) * s;
+              if (j === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+
+          for (let g = 0; g < rock.glints.length; g++) {
+            const glint = rock.glints[g];
+            if (glint.x < left || glint.x > right || glint.y < top || glint.y > bottom) continue;
+            ctx.globalAlpha = alpha * (0.3 + Math.sin(game.visualTime * 1.4 + glint.phase) * 0.15);
+            ctx.fillStyle = "rgba(149, 248, 239, 0.62)";
+            ctx.beginPath();
+            ctx.arc(glint.x, glint.y, glint.size, 0, TAU);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+      }
+
+      function drawJelly(jelly) {
+        const pos = getJellyPosition(jelly);
+        const alpha = jelly.reveal;
+        if (alpha <= 0.01) return;
+        const color = jelly.hue === "amber" ? "#ffc875" : "#cf9cff";
+        const pulse = 0.82 + Math.sin(game.visualTime * 1.7 + jelly.phase) * 0.18;
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = alpha * (0.68 + jelly.flash * 0.32);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+
+        for (let i = 0; i < 6; i++) {
+          const offset = (i - 2.5) * jelly.r * 0.23;
+          const wave = Math.sin(game.visualTime * 1.13 + jelly.phase + i * 0.75);
+          ctx.beginPath();
+          ctx.moveTo(offset * 0.7, jelly.r * 0.18);
+          ctx.bezierCurveTo(
+            offset + wave * 5, jelly.r * 0.75,
+            offset - wave * 7, jelly.r * 1.3,
+            offset + wave * 4, jelly.r * 1.8
+          );
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = jelly.hue === "amber" ? "rgba(255, 200, 117, 0.08)" : "rgba(190, 132, 255, 0.09)";
+        ctx.beginPath();
+        ctx.moveTo(-jelly.r, 0);
+        ctx.bezierCurveTo(-jelly.r * 0.96, -jelly.r * 1.08 * pulse, jelly.r * 0.96, -jelly.r * 1.08 * pulse, jelly.r, 0);
+        ctx.bezierCurveTo(jelly.r * 0.62, jelly.r * 0.56, -jelly.r * 0.62, jelly.r * 0.56, -jelly.r, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 3.6;
+        ctx.globalAlpha = alpha * 0.13;
+        ctx.stroke();
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = alpha * (0.68 + jelly.flash * 0.32);
+        ctx.stroke();
+
+        ctx.globalAlpha = alpha * 0.32;
+        ctx.beginPath();
+        ctx.arc(0, 0, jelly.r * 1.5, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawBeacon(beacon) {
+        if (beacon.collected || beacon.reveal <= 0.012) return;
+        const alpha = beacon.reveal;
+        const wobble = Math.sin(game.visualTime * 1.4 + beacon.phase);
+        ctx.save();
+        ctx.translate(beacon.x, beacon.y);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "rgba(255, 200, 117, 0.8)";
+        ctx.fillStyle = "rgba(255, 200, 117, 0.08)";
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 25 + wobble * 2, 0, TAU);
+        ctx.lineWidth = 4;
+        ctx.globalAlpha = alpha * 0.12;
+        ctx.stroke();
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = alpha;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, 41 + wobble * 4, 0, TAU);
+        ctx.strokeStyle = "rgba(255, 200, 117, 0.26)";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        ctx.rotate(game.visualTime * 0.18 + beacon.phase);
+        ctx.beginPath();
+        ctx.moveTo(-12, -8);
+        ctx.lineTo(12, -8);
+        ctx.lineTo(16, 8);
+        ctx.lineTo(-16, 8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 217, 151, 0.92)";
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -1);
+        ctx.lineTo(0, -17 - wobble * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.75;
+        ctx.fillStyle = "rgba(255, 221, 164, 0.82)";
+        ctx.font = "9px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(beacon.label, beacon.x, beacon.y + 68);
+        ctx.restore();
+      }
+
+      function drawExtraction(extraction) {
+        const alpha = extraction.reveal;
+        const near = game.sub ? distance(game.sub.x, game.sub.y, extraction.x, extraction.y) < 460 : false;
+        const collected = game.world ? game.world.beacons.filter((b) => b.collected).length : 0;
+        if (alpha <= 0.01 && !near) return;
+        const pulse = 0.5 + Math.sin(game.visualTime * 2.1 + extraction.phase) * 0.5;
+        ctx.save();
+        ctx.translate(extraction.x, extraction.y);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = Math.max(alpha, near ? 0.22 : 0.08);
+        ctx.strokeStyle = collected >= 3 ? "rgba(145, 242, 182, 0.92)" : "rgba(97, 224, 215, 0.72)";
+        ctx.fillStyle = collected >= 3 ? "rgba(145, 242, 182, 0.06)" : "rgba(96, 219, 211, 0.04)";
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 52 + pulse * 4, 0, TAU);
+        ctx.lineWidth = 5;
+        ctx.globalAlpha *= 0.18;
+        ctx.stroke();
+        ctx.globalAlpha *= 5.55;
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(0, 0, 30, 0, TAU);
+        ctx.stroke();
+
+        ctx.rotate(game.visualTime * 0.2);
+        for (let i = 0; i < 4; i++) {
+          ctx.rotate(Math.PI / 2);
+          ctx.beginPath();
+          ctx.moveTo(38, -5);
+          ctx.lineTo(55, 0);
+          ctx.lineTo(38, 5);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(alpha * 0.8, near ? 0.22 : 0.06);
+        ctx.fillStyle = collected >= 3 ? "rgba(187, 255, 208, 0.9)" : "rgba(166, 231, 224, 0.72)";
+        ctx.font = "9px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(collected >= 3 ? "撤离点 / READY" : "撤离点 / EXTRACTION", extraction.x, extraction.y + 84);
+        ctx.restore();
+      }
+
+      function drawPulses() {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < game.pulses.length; i++) {
+          const pulse = game.pulses[i];
+          const progress = clamp(pulse.r / pulse.maxR, 0, 1);
+          const baseAlpha = (1 - smoothstep(0.67, 1.06, progress)) * (pulse.color === "green" ? 0.52 : 0.88);
+          if (baseAlpha <= 0.005) continue;
+          const color = pulse.color === "green" ? "145, 242, 182" : "113, 243, 232";
+          ctx.globalAlpha = baseAlpha;
+          ctx.strokeStyle = "rgba(" + color + ", 0.92)";
+          ctx.lineWidth = pulse.color === "green" ? 1.25 : 1.7;
+          ctx.beginPath();
+          ctx.arc(pulse.x, pulse.y, pulse.r, 0, TAU);
+          ctx.stroke();
+
+          ctx.globalAlpha = baseAlpha * 0.1;
+          ctx.lineWidth = pulse.color === "green" ? 5 : 8;
+          ctx.stroke();
+
+          ctx.globalAlpha = baseAlpha * 0.43;
+          ctx.lineWidth = 0.85;
+          ctx.setLineDash([5, 11]);
+          ctx.lineDashOffset = -game.visualTime * 35;
+          ctx.beginPath();
+          ctx.arc(pulse.x, pulse.y, Math.max(0, pulse.r - 23), 0, TAU);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.globalAlpha = baseAlpha * 0.15;
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.arc(pulse.x, pulse.y, Math.max(0, pulse.r - 53), 0, TAU);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawSubmarine() {
+        const sub = game.sub;
+        const speed = Math.hypot(sub.vx, sub.vy);
+        const glow = 0.86 + Math.sin(game.visualTime * 2.4) * 0.08;
+        ctx.save();
+        ctx.translate(sub.x, sub.y);
+
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = sub.slow > 0 ? "rgba(181, 130, 255, 0.2)" : "rgba(76, 216, 211, 0.22)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 42 + Math.sin(game.visualTime * 1.6) * 3, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = "rgba(115, 245, 235, 0.05)";
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, TAU);
+        ctx.fill();
+
+        ctx.rotate(sub.angle);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+
+        if (sub.boosting) {
+          const flame = 20 + speed * 0.04;
+          const flameGradient = ctx.createLinearGradient(-21, 0, -21 - flame, 0);
+          flameGradient.addColorStop(0, "rgba(255, 206, 125, 0.62)");
+          flameGradient.addColorStop(0.52, "rgba(104, 244, 229, 0.28)");
+          flameGradient.addColorStop(1, "rgba(104, 244, 229, 0)");
+          ctx.fillStyle = flameGradient;
+          ctx.beginPath();
+          ctx.moveTo(-19, -6);
+          ctx.quadraticCurveTo(-21 - flame, 0, -19, 6);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        ctx.fillStyle = "rgba(3, 15, 19, 0.92)";
+        ctx.strokeStyle = sub.hull < 26 ? "rgba(255, 120, 109, 0.85)" : "rgba(147, 248, 240, 0.76)";
+        ctx.lineWidth = 1.2;
+
+        ctx.beginPath();
+        ctx.moveTo(25, 0);
+        ctx.bezierCurveTo(18, -11, 4, -15, -17, -10);
+        ctx.quadraticCurveTo(-24, -7, -24, 0);
+        ctx.quadraticCurveTo(-24, 7, -17, 10);
+        ctx.bezierCurveTo(4, 15, 18, 11, 25, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.globalAlpha = 0.11 + glow * 0.03;
+        ctx.stroke();
+        ctx.lineWidth = 1.2;
+        ctx.globalAlpha = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(92, 209, 206, 0.16)";
+        ctx.beginPath();
+        ctx.ellipse(11, -1, 8, 6.5, 0, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(178, 255, 249, 0.64)";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(255, 200, 117, 0.84)";
+        ctx.beginPath();
+        ctx.arc(2, -4, 1.4, 0, TAU);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(115, 231, 223, 0.62)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-9, -11);
+        ctx.lineTo(-13, -17);
+        ctx.lineTo(-20, -13);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-9, 11);
+        ctx.lineTo(-13, 17);
+        ctx.lineTo(-20, 13);
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(-24, 0);
+        ctx.rotate(sub.motorPhase * 8);
+        ctx.strokeStyle = "rgba(162, 241, 235, 0.55)";
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 3; i++) {
+          ctx.rotate(TAU / 3);
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(-7, 5);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = "rgba(101, 243, 234, 0.85)";
+        ctx.beginPath();
+        ctx.arc(21, 0, 1.8 + Math.sin(game.visualTime * 2.5) * 0.35, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawParticles() {
+        ctx.save();
+        for (let i = 0; i < game.particles.length; i++) {
+          const p = game.particles[i];
+          const lifeRatio = clamp(p.life / p.maxLife, 0, 1);
+          ctx.globalAlpha = p.glow ? lifeRatio * 0.86 : lifeRatio * 0.55;
+          ctx.strokeStyle = p.color;
+          ctx.fillStyle = p.color;
+          if (p.bubble) {
+            ctx.lineWidth = 0.7;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, TAU);
+            ctx.stroke();
+          } else {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * lifeRatio, 0, TAU);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      function drawBoundaryWarnings() {
+        const sub = game.sub;
+        const warning = 205;
+        const alpha = Math.max(
+          smoothstep(warning, 70, sub.x),
+          smoothstep(warning, 70, WORLD_W - sub.x),
+          smoothstep(warning, 70, sub.y),
+          smoothstep(warning, 70, WORLD_H - sub.y)
+        );
+        if (alpha <= 0.01) return;
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = alpha * 0.22;
+        ctx.strokeStyle = "#ff786d";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([9, 12]);
+        ctx.strokeRect(67, 67, WORLD_W - 134, WORLD_H - 134);
+        ctx.restore();
+      }
+
+      function drawWorld() {
+        const shakeX = game.shake > 0 ? (Math.random() - 0.5) * game.shake : 0;
+        const shakeY = game.shake > 0 ? (Math.random() - 0.5) * game.shake : 0;
+        const left = game.camera.x - viewW * 0.5 - 150;
+        const top = game.camera.y - viewH * 0.5 - 150;
+        const right = game.camera.x + viewW * 0.5 + 150;
+        const bottom = game.camera.y + viewH * 0.5 + 150;
+
+        ctx.save();
+        ctx.translate(viewW * 0.5 - game.camera.x + shakeX, viewH * 0.5 - game.camera.y + shakeY);
+        drawBoundaryWarnings();
+        drawWorldMotes(left, top, right, bottom);
+        drawCurrents(left, top, right, bottom);
+        drawRocks(left, top, right, bottom);
+        drawExtraction(game.world.extraction);
+        for (let i = 0; i < game.world.jellies.length; i++) {
+          const jelly = game.world.jellies[i];
+          if (jelly.reveal > 0.01) drawJelly(jelly);
+        }
+        for (let i = 0; i < game.world.beacons.length; i++) {
+          drawBeacon(game.world.beacons[i]);
+        }
+        drawPulses();
+        drawSubmarine();
+        drawParticles();
+        ctx.restore();
+      }
+
+      function drawOffscreenMarkers() {
+        if (!game.sub || !game.world) return;
+        const collected = game.world.beacons.filter((b) => b.collected).length;
+        const targets = game.world.beacons
+          .filter((beacon) => !beacon.collected && beacon.reveal > 0.13)
+          .map((beacon) => ({ x: beacon.x, y: beacon.y, color: "#ffc875", label: "信标 0" + beacon.id, alpha: beacon.reveal }));
+
+        if (collected >= 3) {
+          targets.push({
+            x: game.world.extraction.x,
+            y: game.world.extraction.y,
+            color: "#91f2b6",
+            label: "撤离点",
+            alpha: Math.max(0.42, game.world.extraction.reveal)
+          });
+        }
+        if (!targets.length) return;
+
+        const margin = 35;
+        const centerX = viewW * 0.5;
+        const centerY = viewH * 0.5;
+        for (let i = 0; i < targets.length; i++) {
+          const target = targets[i];
+          const screenX = target.x - game.camera.x + centerX;
+          const screenY = target.y - game.camera.y + centerY;
+          const onScreen = screenX > margin && screenX < viewW - margin && screenY > margin && screenY < viewH - margin;
+          if (onScreen) continue;
+          const angle = Math.atan2(screenY - centerY, screenX - centerX);
+          const radiusX = Math.max(60, viewW * 0.5 - 48);
+          const radiusY = Math.max(60, viewH * 0.5 - 48);
+          const scale = Math.min(
+            Math.abs(radiusX / (Math.cos(angle) || 0.0001)),
+            Math.abs(radiusY / (Math.sin(angle) || 0.0001))
+          );
+          const x = centerX + Math.cos(angle) * scale;
+          const y = centerY + Math.sin(angle) * scale;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.globalAlpha = clamp(target.alpha, 0.12, 0.92);
+          ctx.fillStyle = target.color;
+          ctx.beginPath();
+          ctx.moveTo(9, 0);
+          ctx.lineTo(-7, -6);
+          ctx.lineTo(-3, 0);
+          ctx.lineTo(-7, 6);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+
+          ctx.save();
+          ctx.globalAlpha = clamp(target.alpha, 0.12, 0.82);
+          ctx.fillStyle = target.color;
+          ctx.font = "8px ui-monospace, monospace";
+          ctx.textAlign = "center";
+          const tx = clamp(x, 52, viewW - 52);
+          const ty = clamp(y + 22, 36, viewH - 26);
+          ctx.fillText(target.label, tx, ty);
+          ctx.restore();
+        }
+      }
+
+      function drawScreenEffects() {
+        ctx.save();
+        ctx.fillStyle = vignetteGradient;
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        if (noisePattern) {
+          ctx.globalAlpha = 0.16;
+          ctx.fillStyle = noisePattern;
+          ctx.fillRect(0, 0, viewW, viewH);
+        }
+
+        if (game.hitFlash > 0) {
+          ctx.globalAlpha = game.hitFlash;
+          const gradient = ctx.createRadialGradient(viewW * 0.5, viewH * 0.5, Math.min(viewW, viewH) * 0.25, viewW * 0.5, viewH * 0.5, Math.max(viewW, viewH) * 0.7);
+          gradient.addColorStop(0, "rgba(255, 95, 76, 0)");
+          gradient.addColorStop(1, "rgba(255, 85, 68, 0.8)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, viewW, viewH);
+        }
+
+        if (game.slowFlash > 0) {
+          ctx.globalAlpha = game.slowFlash;
+          const gradient = ctx.createRadialGradient(viewW * 0.5, viewH * 0.5, Math.min(viewW, viewH) * 0.18, viewW * 0.5, viewH * 0.5, Math.max(viewW, viewH) * 0.72);
+          gradient.addColorStop(0, "rgba(193, 132, 255, 0)");
+          gradient.addColorStop(1, "rgba(160, 90, 255, 0.52)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, viewW, viewH);
+        }
+
+        if (game.sub && game.sub.oxygen < 22) {
+          const pulse = 0.6 + Math.sin(game.visualTime * 4.1) * 0.4;
+          ctx.globalAlpha = (1 - game.sub.oxygen / 22) * pulse * 0.3;
+          const gradient = ctx.createRadialGradient(viewW * 0.5, viewH * 0.5, Math.min(viewW, viewH) * 0.28, viewW * 0.5, viewH * 0.5, Math.max(viewW, viewH) * 0.7);
+          gradient.addColorStop(0, "rgba(255, 90, 76, 0)");
+          gradient.addColorStop(1, "rgba(255, 70, 60, 0.8)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, viewW, viewH);
+        }
+
+        if (game.sub && game.sub.hull < 28) {
+          ctx.globalAlpha = 0.08 + Math.sin(game.visualTime * 2.7) * 0.035;
+          ctx.strokeStyle = "rgba(255, 116, 102, 0.7)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 8]);
+          ctx.strokeRect(5, 5, viewW - 10, viewH - 10);
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
+      }
+
+      function drawMenuScene() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = backgroundGradient;
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        const anchorX = viewW < 900 ? viewW * 0.56 : viewW * 0.71;
+        const anchorY = viewH * 0.53;
+        const ringScale = Math.min(viewW, viewH) * 0.68;
+        const t = game.menuTime;
+
+        ctx.save();
+        const glow = ctx.createRadialGradient(anchorX, anchorY, 5, anchorX, anchorY, ringScale * 0.8);
+        glow.addColorStop(0, "rgba(34, 137, 139, 0.1)");
+        glow.addColorStop(0.38, "rgba(13, 72, 80, 0.045)");
+        glow.addColorStop(1, "rgba(2, 8, 11, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, viewW, viewH);
+        ctx.restore();
+
+        for (let i = 0; i < menuDust.length; i++) {
+          const dust = menuDust[i];
+          const x = ((dust.x * viewW + t * dust.speed * 8) % (viewW + 30)) - 15;
+          const y = dust.y * viewH + Math.sin(t * 0.2 + dust.phase) * 14;
+          ctx.globalAlpha = 0.12 + 0.18 * (0.5 + Math.sin(t * 0.7 + dust.phase) * 0.5);
+          ctx.fillStyle = "#8bd7d1";
+          ctx.beginPath();
+          ctx.arc(x, y, dust.size, 0, TAU);
+          ctx.fill();
+        }
+
+        ctx.save();
+        ctx.translate(anchorX, anchorY);
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < 4; i++) {
+          const cycle = 4.6;
+          const phase = ((t + i * 1.15) % cycle) / cycle;
+          const r = 70 + phase * ringScale;
+          const alpha = (1 - phase) * 0.22;
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = "rgba(107, 235, 226, 0.9)";
+          ctx.lineWidth = 1.1;
+          ctx.beginPath();
+          ctx.arc(0, 0, r, 0, TAU);
+          ctx.stroke();
+          ctx.globalAlpha = alpha * 0.16;
+          ctx.lineWidth = 7;
+          ctx.stroke();
+        }
+
+        ctx.globalAlpha = 0.12;
+        ctx.strokeStyle = "#72f1e7";
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.arc(0, 0, ringScale * 0.65, 0, TAU);
+        ctx.stroke();
+        for (let i = 0; i < 18; i++) {
+          const a = (i / 18) * TAU;
+          const inner = ringScale * 0.65;
+          const outer = inner + (i % 3 === 0 ? 8 : 4);
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+          ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+          ctx.stroke();
+        }
+
+        ctx.rotate(-0.17 + Math.sin(t * 0.25) * 0.05);
+        ctx.translate(0, Math.sin(t * 0.55) * 5);
+        ctx.globalAlpha = 0.82;
+        ctx.fillStyle = "rgba(4, 21, 25, 0.9)";
+        ctx.strokeStyle = "rgba(130, 239, 230, 0.55)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(37, 0);
+        ctx.bezierCurveTo(24, -15, -2, -18, -24, -12);
+        ctx.quadraticCurveTo(-35, -8, -35, 0);
+        ctx.quadraticCurveTo(-35, 8, -24, 12);
+        ctx.bezierCurveTo(-2, 18, 24, 15, 37, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 5;
+        ctx.globalAlpha = 0.14;
+        ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.82;
+        ctx.stroke();
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = "rgba(124, 244, 234, 0.3)";
+        ctx.beginPath();
+        ctx.ellipse(16, -1, 10, 7, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = vignetteGradient;
+        ctx.fillRect(0, 0, viewW, viewH);
+        if (noisePattern) {
+          ctx.globalAlpha = 0.13;
+          ctx.fillStyle = noisePattern;
+          ctx.fillRect(0, 0, viewW, viewH);
+        }
+        ctx.restore();
+      }
+
+      function render() {
+        if (game.state === "menu") {
+          drawMenuScene();
+          return;
+        }
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = backgroundGradient;
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        if (game.world && game.sub) {
+          drawWorld();
+          drawOffscreenMarkers();
+        }
+        drawScreenEffects();
+      }
+
+      function ensureAudio() {
+        if (!audio.ctx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return null;
+          try {
+            audio.ctx = new AudioContextClass();
+            audio.compressor = audio.ctx.createDynamicsCompressor();
+            audio.compressor.threshold.value = -18;
+            audio.compressor.knee.value = 18;
+            audio.compressor.ratio.value = 5;
+            audio.compressor.attack.value = 0.004;
+            audio.compressor.release.value = 0.28;
+            audio.master = audio.ctx.createGain();
+            audio.master.gain.value = audio.muted ? 0 : 0.68;
+            audio.master.connect(audio.compressor);
+            audio.compressor.connect(audio.ctx.destination);
+
+            const length = Math.floor(audio.ctx.sampleRate * 0.45);
+            audio.noiseBuffer = audio.ctx.createBuffer(1, length, audio.ctx.sampleRate);
+            const data = audio.noiseBuffer.getChannelData(0);
+            for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+          } catch (error) {
+            return null;
+          }
+        }
+        if (audio.ctx.state === "suspended") {
+          audio.ctx.resume().catch(() => {});
+        }
+        return audio.ctx;
+      }
+
+      function tone(config) {
+        const ac = audio.ctx;
+        if (!ac || audio.muted) return;
+        const now = ac.currentTime + (config.delay || 0);
+        const oscillator = ac.createOscillator();
+        const gain = ac.createGain();
+        const duration = config.duration || 0.3;
+        oscillator.type = config.type || "sine";
+        oscillator.frequency.setValueAtTime(Math.max(20, config.frequency || 440), now);
+        if (config.endFrequency) {
+          oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, config.endFrequency), now + duration);
+        }
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, config.volume || 0.08), now + (config.attack || 0.008));
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        oscillator.connect(gain);
+        gain.connect(audio.master);
+        oscillator.start(now);
+        oscillator.stop(now + duration + 0.03);
+      }
+
+      function noiseBurst(volume, duration, lowpass) {
+        const ac = audio.ctx;
+        if (!ac || audio.muted || !audio.noiseBuffer) return;
+        const now = ac.currentTime;
+        const source = ac.createBufferSource();
+        source.buffer = audio.noiseBuffer;
+        const filter = ac.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = lowpass || 600;
+        const gain = ac.createGain();
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(audio.master);
+        source.start(now);
+        source.stop(now + duration + 0.02);
+      }
+
+      function playSonar() {
+        const ac = ensureAudio();
+        if (!ac || audio.muted) return;
+        tone({ frequency: 880, endFrequency: 172, duration: 0.86, volume: 0.12, type: "sine" });
+        tone({ frequency: 1315, endFrequency: 290, duration: 0.45, volume: 0.045, type: "sine", delay: 0.02 });
+        noiseBurst(0.018, 0.22, 1800);
+
+        const now = ac.currentTime;
+        const delay = ac.createDelay(0.8);
+        delay.delayTime.value = 0.17;
+        const feedback = ac.createGain();
+        feedback.gain.value = 0.2;
+        const filter = ac.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 1800;
+        const send = ac.createGain();
+        send.gain.value = 0.13;
+        send.connect(delay);
+        delay.connect(filter);
+        filter.connect(feedback);
+        feedback.connect(delay);
+        filter.connect(audio.master);
+        const oscillator = ac.createOscillator();
+        const gain = ac.createGain();
+        oscillator.frequency.setValueAtTime(690, now);
+        oscillator.frequency.exponentialRampToValueAtTime(130, now + 0.49);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.055, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+        oscillator.connect(gain);
+        gain.connect(send);
+        oscillator.start(now);
+        oscillator.stop(now + 0.5);
+      }
+
+      function playDiscover() {
+        tone({ frequency: 1046, duration: 0.19, volume: 0.045, type: "sine" });
+        tone({ frequency: 1568, duration: 0.33, volume: 0.04, type: "sine", delay: 0.08 });
+      }
+
+      function playCollect() {
+        [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+          tone({ frequency, duration: 0.45, volume: 0.065, type: "triangle", delay: index * 0.075 });
+        });
+        tone({ frequency: 130.81, endFrequency: 261.63, duration: 0.5, volume: 0.035, type: "sine" });
+      }
+
+      function playCollision(intensity) {
+        noiseBurst(0.08 + intensity * 0.12, 0.22 + intensity * 0.2, 260 + intensity * 300);
+        tone({ frequency: 88, endFrequency: 42, duration: 0.3, volume: 0.08 + intensity * 0.06, type: "sine" });
+        tone({ frequency: 164, endFrequency: 63, duration: 0.16, volume: 0.045, type: "triangle" });
+      }
+
+      function playJelly() {
+        tone({ frequency: 338, endFrequency: 122, duration: 0.52, volume: 0.052, type: "sine" });
+        tone({ frequency: 257, endFrequency: 90, duration: 0.42, volume: 0.03, type: "triangle", delay: 0.06 });
+      }
+
+      function playDenied() {
+        tone({ frequency: 125, endFrequency: 92, duration: 0.16, volume: 0.04, type: "square" });
+      }
+
+      function playLowOxygen() {
+        tone({ frequency: 880, duration: 0.1, volume: 0.04, type: "sine" });
+        tone({ frequency: 880, duration: 0.1, volume: 0.03, type: "sine", delay: 0.16 });
+      }
+
+      function playDockTick() {
+        tone({ frequency: 588, duration: 0.2, volume: 0.035, type: "sine" });
+      }
+
+      function playExtractionReady() {
+        [392, 587.33, 783.99].forEach((frequency, index) => {
+          tone({ frequency, duration: 0.65, volume: 0.045, type: "sine", delay: index * 0.11 });
+        });
+      }
+
+      function playWin() {
+        [261.63, 329.63, 392, 523.25, 659.25].forEach((frequency, index) => {
+          tone({ frequency, duration: 1.1, volume: 0.06, type: "triangle", delay: index * 0.13 });
+        });
+        noiseBurst(0.02, 0.55, 2200);
+      }
+
+      function playFail() {
+        [220, 174.61, 130.81, 87.31].forEach((frequency, index) => {
+          tone({ frequency, endFrequency: frequency * 0.72, duration: 0.8, volume: 0.06, type: "sine", delay: index * 0.18 });
+        });
+        noiseBurst(0.035, 0.75, 320);
+      }
+
+      function toggleMute() {
+        audio.muted = !audio.muted;
+        ui.muteBtn.classList.toggle("muted", audio.muted);
+        ui.muteBtn.setAttribute("aria-label", audio.muted ? "开启声音" : "关闭声音");
+        if (audio.master) {
+          const now = audio.ctx.currentTime;
+          audio.master.gain.cancelScheduledValues(now);
+          audio.master.gain.setTargetAtTime(audio.muted ? 0 : 0.68, now, 0.03);
+        }
+        if (!audio.muted) {
+          ensureAudio();
+          tone({ frequency: 740, duration: 0.12, volume: 0.035, type: "sine" });
+        }
+      }
+
+      function updateMenu(dt) {
+        game.menuTime += dt;
+      }
+
+      function updateAmbient(dt) {
+        game.visualTime += dt;
+        updateParticles(dt);
+        if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 26);
+        if (game.hitFlash > 0) game.hitFlash = Math.max(0, game.hitFlash - dt * 1.9);
+      }
+
+      let lastFrame = performance.now();
+      function frame(now) {
+        requestAnimationFrame(frame);
+        const dt = Math.min(0.033, Math.max(0, (now - lastFrame) / 1000));
+        lastFrame = now;
+
+        if (game.state === "playing") {
+          updateGame(dt);
+        } else if (game.state === "menu") {
+          updateMenu(dt);
+        } else if (game.state === "won" || game.state === "lost") {
+          updateAmbient(dt);
+        }
+        render();
+      }
+
+      function handleKeyDown(event) {
+        const code = event.code;
+        const targetTag = event.target && event.target.tagName;
+        const typingSeed = targetTag === "INPUT";
+
+        if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight"].includes(code)) {
+          if (!typingSeed) event.preventDefault();
+        }
+
+        if (code === "KeyM" && !typingSeed) {
+          toggleMute();
+          return;
+        }
+
+        if (game.state === "menu") {
+          if (code === "Enter" && !event.repeat) {
+            beginMission(ui.seedInput.value);
+          }
+          return;
+        }
+
+        if (game.state === "paused") {
+          if (code === "Escape" || code === "KeyP") {
+            if (!event.repeat) resumeMission();
+          }
+          return;
+        }
+
+        if (game.state === "won" || game.state === "lost") {
+          if ((code === "Enter" || code === "KeyR") && !event.repeat) {
+            restartMission();
+          } else if (code === "Escape" && !event.repeat) {
+            showMenu();
+          }
+          return;
+        }
+
+        if (game.state !== "playing") return;
+        keyState.add(code);
+
+        if (code === "Space" && !event.repeat) {
+          emitSonar();
+        } else if ((code === "Escape" || code === "KeyP") && !event.repeat) {
+          pauseMission();
+        }
+      }
+
+      function handleKeyUp(event) {
+        keyState.delete(event.code);
+      }
+
+      window.addEventListener("resize", resize);
+      window.addEventListener("keydown", handleKeyDown, { passive: false });
+      window.addEventListener("keyup", handleKeyUp);
+      window.addEventListener("blur", () => {
+        if (game.state === "playing") pauseMission();
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && game.state === "playing") pauseMission();
+      });
+
+      ui.startBtn.addEventListener("click", () => beginMission(ui.seedInput.value));
+      ui.seedShuffle.addEventListener("click", () => {
+        const words = ["HADAL", "ABYSS", "ECHO", "VENT", "NEREID", "DARK", "TRENCH", "TIDE", "CETUS", "SIREN"];
+        const word = words[Math.floor(Math.random() * words.length)];
+        const number = 100 + Math.floor(Math.random() * 900);
+        ui.seedInput.value = word + "-" + number;
+        ui.seedInput.focus();
+      });
+      ui.seedInput.addEventListener("keydown", (event) => {
+        if (event.code === "Enter") {
+          event.preventDefault();
+          beginMission(ui.seedInput.value);
+        }
+      });
+      ui.resumeBtn.addEventListener("click", resumeMission);
+      ui.restartPause.addEventListener("click", restartMission);
+      ui.menuPause.addEventListener("click", showMenu);
+      ui.retryBtn.addEventListener("click", restartMission);
+      ui.newSeedBtn.addEventListener("click", () => {
+        showMenu();
+        ui.seedShuffle.click();
+      });
+      ui.backMenuBtn.addEventListener("click", showMenu);
+      ui.muteBtn.addEventListener("click", toggleMute);
+      canvas.addEventListener("pointerdown", () => {
+        if (game.state === "playing") emitSonar();
+      });
+
+      const reachabilityGrid = {
+        step: 34
+      };
+
+      function validateReachability(world) {
+        if (!world) return { ok: false, reason: "no-world" };
+        const step = reachabilityGrid.step;
+        const cols = Math.floor((world.w - 140) / step);
+        const rows = Math.floor((world.h - 140) / step);
+        const blocked = new Uint8Array(cols * rows);
+
+        function toCell(x, y) {
+          return {
+            c: Math.round((x - 70) / step),
+            r: Math.round((y - 70) / step)
+          };
+        }
+
+        function blockedAt(c, r) {
+          const x = 70 + c * step;
+          const y = 70 + r * step;
+          for (let i = 0; i < world.rocks.length; i++) {
+            const rock = world.rocks[i];
+            if (distance(x, y, rock.x, rock.y) > rock.r + SUB_RADIUS + 4) continue;
+            if (circlePolygonCollision(x, y, SUB_RADIUS + 2, rock.points)) return true;
+          }
+          return false;
+        }
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (c === 0 || r === 0 || c === cols - 1 || r === rows - 1) {
+              blocked[r * cols + c] = 1;
+            } else if (blockedAt(c, r)) {
+              blocked[r * cols + c] = 1;
+            }
+          }
+        }
+
+        const startCell = toCell(world.start.x, world.start.y);
+        const queue = [startCell];
+        const seen = new Uint8Array(cols * rows);
+        const index = startCell.r * cols + startCell.c;
+        if (index < 0 || index >= seen.length) return { ok: false, reason: "start-out-of-bounds" };
+        seen[index] = 1;
+        const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for (let head = 0; head < queue.length; head++) {
+          const cur = queue[head];
+          for (let d = 0; d < 4; d++) {
+            const nc = cur.c + dirs[d][0];
+            const nr = cur.r + dirs[d][1];
+            if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+            const ni = nr * cols + nc;
+            if (seen[ni] || blocked[ni]) continue;
+            seen[ni] = 1;
+            queue.push({ c: nc, r: nr });
+          }
+        }
+
+        const targets = world.beacons.map((beacon) => {
+          const cell = toCell(beacon.x, beacon.y);
+          return { label: beacon.label, reachable: !!seen[cell.r * cols + cell.c] };
+        });
+        return {
+          ok: targets.every((target) => target.reachable),
+          targets,
+          reachableCells: queue.length
+        };
+      }
+
+      window.__blindTide = {
+        getState: () => game.state,
+        getSeed: () => game.seed,
+        getWorld: () => game.world,
+        getSub: () => game.sub,
+        getPulses: () => game.pulses.map((pulse) => ({
+          x: pulse.x,
+          y: pulse.y,
+          r: pulse.r,
+          maxR: pulse.maxR,
+          color: pulse.color,
+          free: pulse.free
+        })),
+        validateReachability: () => validateReachability(game.world),
+        emitSonar,
+        start: beginMission,
+        pause: pauseMission,
+        resume: resumeMission,
+        setSubPosition: (x, y) => {
+          if (!game.sub) return;
+          game.sub.x = x;
+          game.sub.y = y;
+          game.sub.vx = 0;
+          game.sub.vy = 0;
+        },
+        setSubStats: (stats) => {
+          if (!game.sub || !stats) return;
+          Object.assign(game.sub, stats);
+        }
+      };
+
+      ui.seedInput.value = DEFAULT_SEED;
+      resize();
+      initSonarPips();
+      setHudActive(false);
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
