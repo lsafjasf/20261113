@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>末班渡轮 · Last Ferry</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <h1>末班渡轮</h1>
+      <span class="subtitle">Last Ferry · 实时调度</span>
+    </div>
+    <div class="hud">
+      <div class="hud-item" id="hud-timer" title="剩余时间">
+        <span class="hud-label">时间</span>
+        <span class="hud-value" id="timer-value">2:30</span>
+      </div>
+      <div class="hud-item" id="hud-fuel" title="剩余燃油">
+        <span class="hud-label">燃油</span>
+        <div class="fuel-shell"><div class="fuel-fill" id="fuel-fill"></div></div>
+        <span class="hud-value small" id="fuel-value">--</span>
+      </div>
+      <div class="hud-item" title="当前载重 / 容量">
+        <span class="hud-label">载重</span>
+        <span class="hud-value" id="load-value">0/4</span>
+      </div>
+      <div class="hud-item" title="当前船速">
+        <span class="hud-label">船速</span>
+        <span class="hud-value" id="speed-value">0</span>
+      </div>
+      <div class="hud-actions">
+        <button id="btn-pause" class="btn" type="button">暂停</button>
+        <button id="btn-mute" class="btn" type="button">🔊 音效</button>
+        <button id="btn-restart" class="btn" type="button">重开</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="canvas-wrap">
+      <canvas id="sea" width="960" height="600"></canvas>
+      <div id="toast-layer"></div>
+      <div id="pause-banner" class="banner hidden">已暂停 — 模拟完全停止</div>
+      <div id="end-overlay" class="overlay hidden">
+        <div class="overlay-card">
+          <h2 id="end-title">任务结束</h2>
+          <p id="end-detail"></p>
+          <div class="overlay-stats" id="end-stats"></div>
+          <div class="overlay-actions">
+            <button id="btn-replay" class="btn primary" type="button">同 seed 重开</button>
+            <button id="btn-new-seed" class="btn" type="button">换一个 seed</button>
+          </div>
+        </div>
+      </div>
+      <div id="start-overlay" class="overlay">
+        <div class="overlay-card">
+          <h2>末班渡轮</h2>
+          <p class="intro">150 秒内把 8 名乘客送达各自目的岛。点击岛名设下一站，靠港后在候船名单里挑人上船；载重越高，船越慢、越耗油。注意横向海流。</p>
+          <label class="seed-row">
+            seed
+            <input id="seed-input" type="text" value="ferry-2026" />
+          </label>
+          <div class="overlay-actions">
+            <button id="btn-start" class="btn primary" type="button">出航</button>
+            <button id="btn-random-seed" class="btn" type="button">随机 seed</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <section class="panel-block progress-block">
+        <div class="progress-title">
+          <span>调度进度</span>
+          <span id="progress-value">已送达 0 / 8</span>
+        </div>
+        <div class="progress-shell"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="current-info" id="current-info">泊位于 雾屿</div>
+      </section>
+
+      <section class="panel-block">
+        <h3>岛屿与候船名单</h3>
+        <div id="island-list"></div>
+      </section>
+
+      <section class="panel-block">
+        <h3>船上乘客 <span class="dim" id="onboard-cap">(0/4)</span></h3>
+        <ul id="onboard-list" class="onboard-list"><li class="dim empty-hint">船舱空着</li></ul>
+      </section>
+
+      <section class="panel-block legend">
+        <h3>图例</h3>
+        <ul>
+          <li><span class="dot" style="background:#ff8f5c"></span>去 雾屿</li>
+          <li><span class="dot" style="background:#5cd6ff"></span>去 灯塔角</li>
+          <li><span class="dot" style="background:#b9f06b"></span>去 沙洲</li>
+        </ul>
+        <p class="dim tip">靠港后点击候船条目让其上船，再点任意岛名开船。海上也能改目的地。</p>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
