@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>最后一盏灯 · 夜间救援</title>
+  <style>
+    :root {
+      --bg: #061013;
+      --panel: rgba(9, 26, 28, 0.82);
+      --line: rgba(143, 208, 194, 0.18);
+      --teal: #8fd0c2;
+      --gold: #f2cf8d;
+      --gold-bright: #ffe6b0;
+      --danger: #e0685a;
+      --text: #e8e3d4;
+      --muted: #8fa7a1;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; background: var(--bg);
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+      color: var(--text); overflow: hidden;
+    }
+    #stage { position: relative; width: 100vw; height: 100vh; display: grid; place-items: center; }
+    #sea {
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+      display: block; cursor: crosshair; background: #071316;
+    }
+    .hud {
+      position: absolute; inset: 0; pointer-events: none;
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+      margin: auto;
+    }
+    .hud .chip {
+      position: absolute; background: var(--panel);
+      border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 16px; backdrop-filter: blur(6px);
+    }
+    #top-timer { top: 22px; left: 50%; transform: translateX(-50%); text-align: center; min-width: 190px; }
+    #top-timer .kicker { font-size: 11px; letter-spacing: 3px; color: var(--muted); }
+    #timer { font-size: 44px; font-weight: 300; color: var(--gold-bright); font-variant-numeric: tabular-nums; }
+    #top-left { top: 22px; left: 22px; display: flex; align-items: center; gap: 12px; }
+    .lamp-dot {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1px solid var(--gold);
+      background: radial-gradient(circle, rgba(242,207,141,.8), rgba(242,207,141,.15));
+      box-shadow: 0 0 18px rgba(242, 207, 141, 0.45);
+    }
+    #top-left .name { font-size: 15px; letter-spacing: 4px; }
+    #top-left .sub { font-size: 11px; color: var(--muted); letter-spacing: 2px; }
+    #top-right { top: 22px; right: 22px; display: flex; gap: 10px; pointer-events: auto; }
+    button {
+      font: inherit; color: var(--text); background: var(--panel);
+      border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 14px; cursor: pointer; letter-spacing: 1px;
+    }
+    button:hover { border-color: var(--gold); color: var(--gold-bright); }
+    #counters { left: 22px; bottom: 22px; min-width: 220px; font-size: 13px; }
+    #counters .row { display: flex; justify-content: space-between; gap: 18px; padding: 4px 0; }
+    #counters .label { color: var(--muted); letter-spacing: 2px; }
+    #rescued-count { color: var(--teal); font-weight: 600; }
+    #wrecked-count { color: var(--danger); font-weight: 600; }
+    #generator { right: 22px; bottom: 22px; width: 320px; font-size: 12px; }
+    #generator .g-title { display: flex; justify-content: space-between; color: var(--muted); letter-spacing: 2px; margin-bottom: 8px; }
+    .bar { height: 10px; border-radius: 5px; background: rgba(255,255,255,.08); overflow: hidden; margin: 5px 0 10px; }
+    .bar > i { display: block; height: 100%; border-radius: 5px; transition: width .12s linear; }
+    #energy-fill { width: 100%; background: linear-gradient(90deg, #6fb7ad, #f2cf8d); }
+    #heat-fill { width: 0%; background: linear-gradient(90deg, #6fb7ad, #d8a14f 55%, #e0685a); }
+    #heat-fill.warm { box-shadow: 0 0 10px rgba(216, 161, 79, .6); }
+    #heat-fill.hot { box-shadow: 0 0 14px rgba(224, 104, 90, .8); }
+    .bar-row { display: flex; justify-content: space-between; color: var(--muted); }
+    #blackout-tag {
+      display: none; margin-top: 8px; padding: 6px; text-align: center;
+      border: 1px solid var(--danger); color: var(--danger);
+      border-radius: 6px; letter-spacing: 3px; animation: blink 1s infinite;
+    }
+    #blackout-tag.visible { display: block; }
+    @keyframes blink { 50% { opacity: .35; } }
+    #hint { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+    #status-text { color: var(--gold); }
+    .overlay {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      background: rgba(4, 12, 14, 0.72); backdrop-filter: blur(4px);
+      z-index: 10; transition: opacity .25s;
+    }
+    .overlay.hidden { opacity: 0; pointer-events: none; }
+    .card {
+      width: min(920px, 86vw); background: rgba(10, 28, 30, .95);
+      border: 1px solid var(--line); border-radius: 16px;
+      padding: 42px 48px; box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    }
+    .kicker { color: var(--gold); font-size: 12px; letter-spacing: 4px; margin-bottom: 12px; }
+    .card h1 { margin: 0 0 14px; font-size: 52px; font-weight: 400; letter-spacing: 8px; }
+    .card p { color: var(--muted); line-height: 1.8; margin: 8px 0; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 26px 0; }
+    .step { border-top: 1px solid var(--line); padding-top: 14px; }
+    .step b { color: var(--gold); font-weight: 500; letter-spacing: 2px; }
+    .step span { display: block; margin-top: 8px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }
+    .stat-grid div { border-top: 1px solid var(--line); padding-top: 12px; }
+    .stat-grid span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .stat-grid strong { font-size: 30px; font-weight: 300; color: var(--gold-bright); }
+    .stat-grid em { font-size: 14px; font-style: normal; color: var(--muted); }
+    .primary {
+      background: linear-gradient(135deg, #e7c184, #f2cf8d);
+      color: #2a2013; border: none; padding: 14px 34px;
+      font-weight: 600; letter-spacing: 3px; border-radius: 8px;
+      box-shadow: 0 8px 28px rgba(242, 207, 141, .25);
+    }
+    .primary:hover { color: #2a2013; filter: brightness(1.06); }
+    .foot { margin-top: 18px; font-size: 12px; color: var(--muted); }
+    kbd {
+      border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px;
+      font-family: ui-monospace, monospace; color: var(--teal);
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="sea" width="1600" height="900"></canvas>
+    <div class="hud">
+      <div class="chip" id="top-left">
+        <div class="lamp-dot"></div>
+        <div>
+          <div class="name">最后一盏灯</div>
+          <div class="sub">NORTH BAY · 23:47</div>
+        </div>
+      </div>
+      <div class="chip" id="top-timer">
+        <div class="kicker">剩余时间</div>
+        <div id="timer">90.0</div>
+      </div>
+      <div id="top-right">
+        <button id="mute-btn" data-muted="false">声音 开</button>
+        <button id="pause-btn">暂停 P</button>
+      </div>
+      <div class="chip" id="counters">
+        <div class="row"><span class="label">成功入港</span><span id="rescued-count">0 / 4</span></div>
+        <div class="row"><span class="label">触礁失事</span><span id="wrecked-count">0 / 2</span></div>
+        <div class="row"><span class="label">灯塔状态</span><span id="status-text">常规值守</span></div>
+      </div>
+      <div class="chip" id="generator">
+        <div class="g-title"><span>发电机</span><span id="energy-text">100%</span></div>
+        <div class="bar"><i id="energy-fill"></i></div>
+        <div class="bar-row"><span>温度色带</span><span id="heat-text">0°C</span></div>
+        <div class="bar"><i id="heat-fill"></i></div>
+        <div class="g-title"><span><kbd>SPACE</kbd> 按住增强亮度</span><span>过热/断电会熄灯</span></div>
+        <div id="blackout-tag">灯塔熄灭 · 等待恢复</div>
+      </div>
+      <div id="hint">鼠标移动光束 · 按住 SPACE 增强亮度 · P 暂停</div>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="card">
+        <div class="kicker" id="overlay-kicker"></div>
+        <h1 id="overlay-title"></h1>
+        <div id="overlay-body"></div>
+        <button class="primary" id="primary-btn"></button>
+        <div class="foot">光束只能修正航向，无法停船；两艘触礁、三次熄灯或时间耗尽即失败。</div>
+      </div>
+    </div>
+  </div>
+
+  <template id="tpl-ready">
+    <p>风暴把五艘货船推进了北湾。你无法直接掌舵，只能旋转灯塔光束——被照亮的船会缓慢朝光斑中心修正航向，离开光束后仍受侧风与惯性摆布。</p>
+    <div class="steps">
+      <div class="step"><b>01 转动光束</b><span>移动鼠标，让光锥罩住漂移的货船，光斑就是它们试图靠拢的方向。</span></div>
+      <div class="step"><b>02 临时增强</b><span>按住 <kbd>SPACE</kbd> 提高亮度，转向更快、射程更远，但耗电与升温都会加剧。</span></div>
+      <div class="step"><b>03 引导入港</b><span>在 90 秒内把至少四艘船带进左侧两码头之间的港口入口，躲开暗礁与岸线。</span></div>
+    </div>
+  </template>
+
+  <script src="engine.js"></script>
+  <script src="renderer.js"></script>
+  <script src="audio.js"></script>
+  <script>
+    // UMD 模块在浏览器下挂到 *_GLOBAL，这里给主逻辑起短名字。
+    window.ENGINE = ENGINE_GLOBAL;
+    window.RENDERER = RENDERER_GLOBAL;
+    window.GAME_AUDIO = AUDIO_GLOBAL;
+  </script>
+  <script src="main.js"></script>
+</body>
+</html>

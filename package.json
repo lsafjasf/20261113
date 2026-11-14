@@ -1,0 +1,16 @@
+{
+  "name": "the-last-lamp",
+  "version": "1.0.0",
+  "description": "《最后一盏灯》夜间灯塔救援 Canvas 小游戏",
+  "main": "main.js",
+  "scripts": {
+    "test": "node tests.js",
+    "test:render": "node render.test.js",
+    "test:browser": "node browser.test.js",
+    "serve": "node serve.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.49.1"
+  }
+}
