@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102a2b">
+  <title>潮汐盐场 · 三池值守</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div>
+          <p class="eyebrow">TIDAL WORKS · 盐务所</p>
+          <h1>潮汐盐场 <span>三池值守</span></h1>
+        </div>
+      </div>
+
+      <div class="phase-panel" aria-label="本轮天气">
+        <div class="phase-heading">
+          <span id="phaseIcon" class="phase-icon">◒</span>
+          <div>
+            <small id="phaseKicker">第一轮</small>
+            <strong id="phaseLabel">涨潮</strong>
+          </div>
+          <span id="phaseClock" class="phase-clock">00:00</span>
+        </div>
+        <div class="phase-track" id="phaseTrack">
+          <div class="phase-seg tide"><span>涨潮</span><i></i></div>
+          <div class="phase-seg shower"><span>阵雨</span><i></i></div>
+          <div class="phase-seg sun"><span>强日照</span><i></i></div>
+        </div>
+      </div>
+
+      <div class="top-stats">
+        <div class="stat">
+          <small>剩余时间</small>
+          <strong id="timeLeft">02:00</strong>
+        </div>
+        <div class="stat harvest-stat">
+          <small>本局收成</small>
+          <strong><span id="batchCount">0</span><em>/ 2 批</em></strong>
+        </div>
+        <button id="soundBtn" class="icon-btn" type="button" aria-label="切换声音" title="切换声音">
+          <span id="soundIcon">♪</span>
+        </button>
+        <button id="pauseBtn" class="icon-btn" type="button" aria-label="暂停或继续" title="暂停 / 继续 (P)">
+          <span id="pauseIcon">Ⅱ</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="scene-shell" aria-label="盐场实时画面">
+      <canvas id="sceneCanvas"></canvas>
+
+      <div class="scene-topline">
+        <div id="weatherBadge" class="weather-badge tide">
+          <span class="weather-dot"></span>
+          <span id="weatherText">潮水正在上涨</span>
+        </div>
+        <div id="tideGauge" class="tide-gauge">
+          <span>外渠潮位</span>
+          <div class="gauge-track"><i id="tideFill"></i></div>
+          <strong id="tideValue">64</strong>
+        </div>
+      </div>
+
+      <div class="alert-stack" id="alertStack" aria-live="polite"></div>
+
+      <div class="mission-ribbon" id="missionRibbon">
+        <span class="mission-step active" data-step="fill">01 蓄水</span>
+        <span class="mission-line"></span>
+        <span class="mission-step" data-step="protect">02 护池</span>
+        <span class="mission-line"></span>
+        <span class="mission-step" data-step="harvest">03 收盐 ×2</span>
+      </div>
+
+      <div class="pause-overlay" id="pauseOverlay" hidden>
+        <div class="pause-card">
+          <span class="pause-glyph">Ⅱ</span>
+          <p class="eyebrow">WEATHER HELD</p>
+          <h2>值守已暂停</h2>
+          <p>潮汐、降雨、蒸发与水流均已冻结。</p>
+          <button id="resumeBtn" type="button" class="primary-btn">继续值守 <kbd>P</kbd></button>
+        </div>
+      </div>
+
+      <div class="start-overlay" id="startOverlay">
+        <div class="start-card">
+          <p class="eyebrow">120 秒 · 三池联控</p>
+          <h2>守住水位，<br><span>晒出两批盐。</span></h2>
+          <p class="start-copy">开闸引潮，用泵循环卤水，趁强日照把盐度晒到达标线。阵雨前开排水闸，任何池子满溢都会立即失败。</p>
+          <div class="rule-row">
+            <div><strong>18—92</strong><small>安全水位 %</small></div>
+            <div><strong>≥ 60</strong><small>收盐盐度 ‰</small></div>
+            <div><strong>2 批</strong><small>本局目标</small></div>
+          </div>
+          <button id="startBtn" type="button" class="primary-btn">开始值守 <span>→</span></button>
+          <p class="start-hint">声音将在开始后启用 · 空格暂停</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="control-deck">
+      <div class="machine-panel">
+        <div class="panel-heading">
+          <span class="section-no">01</span>
+          <div><small>HYDRAULICS</small><h2>水闸与泵</h2></div>
+          <span class="flow-chip"><i></i><span id="flowSummary">静水</span></span>
+        </div>
+
+        <div class="gate-row">
+          <div class="control-label">
+            <span class="gate-letter">A</span>
+            <div><strong>进水闸</strong><small>外渠 → 一池</small></div>
+          </div>
+          <input id="gateA" class="slider gate-slider" type="range" min="0" max="100" value="0" aria-label="进水闸开度">
+          <output id="gateAValue" for="gateA">0%</output>
+          <button class="quick-btn" data-gate="a" data-value="55" type="button">半开</button>
+        </div>
+
+        <div class="gate-row">
+          <div class="control-label">
+            <span class="gate-letter drain">B</span>
+            <div><strong>排水闸</strong><small>三池 → 外渠</small></div>
+          </div>
+          <input id="gateB" class="slider gate-slider drain-slider" type="range" min="0" max="100" value="0" aria-label="排水闸开度">
+          <output id="gateBValue" for="gateB">0%</output>
+          <button class="quick-btn" data-gate="b" data-value="70" type="button">快排</button>
+        </div>
+
+        <div class="pump-row">
+          <button id="pumpBtn" class="pump-btn" type="button" aria-pressed="false">
+            <span class="pump-symbol" aria-hidden="true"><i></i></span>
+            <span><strong>循环泵</strong><small id="pumpState">已停机</small></span>
+          </button>
+          <div class="pump-power">
+            <label for="pumpPower">泵速 <output id="pumpPowerValue">65%</output></label>
+            <input id="pumpPower" class="slider pump-slider" type="range" min="30" max="100" value="65" aria-label="抽水泵功率">
+          </div>
+          <span class="pump-route">三池 → 一池</span>
+        </div>
+      </div>
+
+      <div class="pond-panel">
+        <div class="panel-heading pond-heading">
+          <span class="section-no">02</span>
+          <div><small>CRYSTALLIZERS</small><h2>池况与收盐</h2></div>
+          <div class="legend">
+            <span><i class="level-dot"></i>水位</span>
+            <span><i class="salt-dot"></i>盐度</span>
+          </div>
+        </div>
+        <div class="pond-grid">
+          <article class="pond-card" data-pond="0">
+            <div class="pond-card-top">
+              <span class="pond-index">一池</span>
+              <span class="pond-state" id="pondState0">待蓄水</span>
+            </div>
+            <p class="pond-reading"><strong id="salt0">—</strong><small>‰</small><span id="level0">—%</span></p>
+            <div class="mini-gauge"><i id="miniLevel0"></i><b id="miniSalt0"></b></div>
+            <button class="harvest-btn" data-harvest="0" type="button" disabled>盐度不足</button>
+          </article>
+          <article class="pond-card" data-pond="1">
+            <div class="pond-card-top">
+              <span class="pond-index">二池</span>
+              <span class="pond-state" id="pondState1">待蓄水</span>
+            </div>
+            <p class="pond-reading"><strong id="salt1">—</strong><small>‰</small><span id="level1">—%</span></p>
+            <div class="mini-gauge"><i id="miniLevel1"></i><b id="miniSalt1"></b></div>
+            <button class="harvest-btn" data-harvest="1" type="button" disabled>盐度不足</button>
+          </article>
+          <article class="pond-card" data-pond="2">
+            <div class="pond-card-top">
+              <span class="pond-index">三池</span>
+              <span class="pond-state" id="pondState2">待蓄水</span>
+            </div>
+            <p class="pond-reading"><strong id="salt2">—</strong><small>‰</small><span id="level2">—%</span></p>
+            <div class="mini-gauge"><i id="miniLevel2"></i><b id="miniSalt2"></b></div>
+            <button class="harvest-btn" data-harvest="2" type="button" disabled>盐度不足</button>
+          </article>
+        </div>
+        <div class="deck-footer">
+          <span id="hintText"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 收盐　<kbd>Q</kbd><kbd>E</kbd> 进水闸　<kbd>A</kbd><kbd>D</kbd> 排水闸</span>
+          <button id="restartBtn" class="text-btn" type="button">重新开一局</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="end-overlay" id="endOverlay" hidden>
+    <div class="end-card">
+      <span id="endGlyph" class="end-glyph">✓</span>
+      <p class="eyebrow" id="endKicker">SHIFT COMPLETE</p>
+      <h2 id="endTitle">两批盐，收成了。</h2>
+      <p id="endCopy">潮汐、雨水和日照都已被你驯服。</p>
+      <div class="end-stats">
+        <div><strong id="endBatch">0</strong><small>收获批次</small></div>
+        <div><strong id="endTime">00:00</strong><small>值守用时</small></div>
+        <div><strong id="endLevel">—</strong><small>最低水位</small></div>
+      </div>
+      <button id="againBtn" type="button" class="primary-btn">再守一局 <span>↻</span></button>
+    </div>
+  </div>
+
+  <script src="src/config.js"></script>
+  <script src="src/simulation.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/renderer.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
