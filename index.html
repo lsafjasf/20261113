@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>磁暴清扫队 · Magnet Storm Salvage</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #04060e; }
+  body { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #dfe8ff; user-select: none; }
+  #game { position: absolute; inset: 0; display: block; cursor: crosshair; }
+
+  #hud { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+  .panel {
+    background: rgba(8, 14, 30, .62); border: 1px solid rgba(90, 160, 255, .35);
+    border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(4px);
+    box-shadow: 0 0 18px rgba(40, 110, 255, .18);
+  }
+  #status { position: absolute; left: 16px; top: 16px; width: 238px; }
+  #status h3 { font-size: 12px; letter-spacing: 3px; color: #7fb2ff; margin-bottom: 8px; font-weight: 600; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; }
+  .bar-row label { width: 34px; color: #9db4dd; }
+  .bar { flex: 1; height: 10px; border-radius: 5px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: 5px; transition: width .12s linear; }
+  #hullFill { background: linear-gradient(90deg, #ff5f6d, #ffc371); }
+  #fuelFill { background: linear-gradient(90deg, #22d3ee, #3b82f6); }
+  #meta-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; }
+  #meta-row .num { font-weight: 700; color: #8ee6ff; }
+  #seed-line { margin-top: 6px; font-size: 10px; color: #64769c; letter-spacing: 1px; }
+
+  #minimap { position: absolute; right: 16px; top: 16px; border-radius: 50%; }
+  #storm-warn {
+    position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+    padding: 8px 22px; border-radius: 20px; font-weight: 700; letter-spacing: 4px;
+    background: rgba(120, 20, 30, .7); border: 1px solid #ff6b6b; color: #ffd6d6;
+    display: none; animation: blink .8s infinite;
+  }
+  @keyframes blink { 50% { opacity: .35; } }
+  #toast {
+    position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%);
+    font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #8ee6ff;
+    text-shadow: 0 0 12px rgba(60,180,255,.8); opacity: 0; transition: opacity .3s;
+  }
+  #hint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: #64769c; letter-spacing: 1px; white-space: nowrap; }
+
+  .overlay {
+    position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, rgba(10,18,40,.72), rgba(3,5,12,.92));
+  }
+  .card {
+    width: min(560px, 88vw); padding: 38px 42px; text-align: center;
+    background: rgba(10, 20, 44, .85); border: 1px solid rgba(90,160,255,.4); border-radius: 18px;
+    box-shadow: 0 0 60px rgba(50,120,255,.25);
+  }
+  .card h1 { font-size: 34px; letter-spacing: 8px; margin-bottom: 6px;
+    background: linear-gradient(90deg,#67e8f9,#60a5fa,#c084fc); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card h2 { font-size: 26px; letter-spacing: 6px; margin-bottom: 14px; }
+  .card .sub { color: #8ea4cf; font-size: 13px; letter-spacing: 2px; margin-bottom: 22px; }
+  .controls { text-align: left; font-size: 13px; line-height: 2; color: #b7c8ea;
+    background: rgba(255,255,255,.04); border-radius: 12px; padding: 14px 20px; margin-bottom: 24px; }
+  .controls b { color: #8ee6ff; font-weight: 700; }
+  .seed-input {
+    width: 100%; padding: 10px 14px; margin-bottom: 18px; border-radius: 8px;
+    border: 1px solid rgba(90,160,255,.4); background: rgba(4,8,20,.8); color: #cfe2ff;
+    font-size: 14px; letter-spacing: 2px; text-align: center;
+  }
+  .btn {
+    pointer-events: auto; cursor: pointer; border: none; border-radius: 10px;
+    padding: 12px 34px; font-size: 15px; font-weight: 700; letter-spacing: 4px;
+    color: #06101f; background: linear-gradient(90deg, #67e8f9, #60a5fa);
+    box-shadow: 0 0 24px rgba(80,160,255,.45); transition: transform .12s, box-shadow .12s;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 0 34px rgba(80,180,255,.7); }
+  .btn.ghost { background: transparent; color: #9db4dd; border: 1px solid rgba(120,160,220,.5); box-shadow: none; margin-left: 12px; }
+  .result-stats { font-size: 14px; line-height: 2; color: #b7c8ea; margin-bottom: 24px; }
+  .result-stats b { color: #8ee6ff; }
+  .hidden { display: none !important; }
+  #pauseBtn { position: absolute; right: 16px; bottom: 16px; z-index: 6; pointer-events: auto;
+    padding: 8px 16px; font-size: 12px; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="status" class="panel">
+    <h3>磁暴清扫队</h3>
+    <div class="bar-row"><label>船体</label><div class="bar"><i id="hullFill"></i></div><span id="hullText">100</span></div>
+    <div class="bar-row"><label>燃料</label><div class="bar"><i id="fuelFill"></i></div><span id="fuelText">100</span></div>
+    <div id="meta-row"><span>碎片 <span class="num" id="fragText">0/4</span></span>
+      <span>计时 <span class="num" id="timeText">240</span>s</span></div>
+    <div id="seed-line"></div>
+  </div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="storm-warn">太阳风暴预警</div>
+  <div id="toast"></div>
+  <button id="pauseBtn" class="btn">暂停 P</button>
+  <div id="hint">W 推进 · A/D 转向 · S 反推 · Space 磁力牵引 · P 暂停 · R 重开 · M 静音</div>
+</div>
+
+<div id="overlay-start" class="overlay">
+  <div class="card">
+    <h1>磁暴清扫队</h1>
+    <div class="sub">MAGNET STORM SALVAGE · 近地轨道回收任务</div>
+    <div class="controls">
+      <b>W</b> 主推进器 &nbsp;·&nbsp; <b>A / D</b> 左右转向 &nbsp;·&nbsp; <b>S</b> 反向制动<br>
+      <b>Space</b> 磁力牵引（按住生效，同一时间只能锁定一块碎片）<br>
+      拖带碎片会显著增加质量、惯性与转向阻力，碎片越大越沉重。<br>
+      回收全部 <b>4 块失控碎片</b> 并返回空间站即胜利；燃料耗尽、船体损毁或超时则失败。
+    </div>
+    <input id="seedInput" class="seed-input" value="MAGNET-2026" maxlength="24">
+    <button id="startBtn" class="btn">开始任务</button>
+  </div>
+</div>
+
+<div id="overlay-pause" class="overlay hidden">
+  <div class="card">
+    <h2>任务暂停</h2>
+    <div class="sub">轨道时间已冻结</div>
+    <button id="resumeBtn" class="btn">继续 P</button>
+    <button id="restartBtn1" class="btn ghost">重开 R</button>
+  </div>
+</div>
+
+<div id="overlay-lose" class="overlay hidden">
+  <div class="card">
+    <h2 style="color:#ff8a8a">任务失败</h2>
+    <div class="sub" id="loseReason">船体耐久归零</div>
+    <div class="result-stats" id="loseStats"></div>
+    <button id="retryBtn" class="btn">再次出击 R</button>
+  </div>
+</div>
+
+<div id="overlay-win" class="overlay hidden">
+  <div class="card">
+    <h2 style="color:#8ee6ff">回收成功</h2>
+    <div class="sub">全部碎片已安全送回空间站</div>
+    <div class="result-stats" id="winStats"></div>
+    <button id="winRetryBtn" class="btn">再来一局 R</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ===ENGINE=== */
+/* 磁暴清扫队 —— 纯逻辑引擎（不依赖 DOM/Audio，可在 Node 中直接测试） */
+
+const CFG = {
+  WORLD_R: 1500,            // 圆形轨道场半径
+  TIME_LIMIT: 240,          // 任务时限（秒）
+  SHIP: {
+    mass: 1, hull: 100, fuel: 320, radius: 16,
+    thrust: 270, brake: 210, turnTorque: 9.5,
+    inertia: 1.1, angDrag: 1.4, linDrag: 0.02,
+    fuelThrust: 3.4, fuelBrake: 2.4, fuelMagnet: 0.55,
+    magnetRange: 240, dockSpeed: 140, hitInvuln: 1.1
+  },
+  DEBRIS_RADII: [18, 24, 30, 40],   // 最后一块为大型碎片
+  DEBRIS_DENSITY: 0.0022,           // mass = density * r^2
+  WRECK_COUNT: 18,
+  STATION: { x: 0, y: 0, r: 55, dockR: 100 },
+  TETHER: { rest: 95, iterations: 6, damping: 0.04, bias: 0.2 },
+  STORM: { accelShip: 30, accelDebris: 26, warn: 4, first: 28, gapMin: 26, gapMax: 38, durMin: 6, durMax: 9 },
+  FUEL_GRACE: 4
+};
+
+function cyrb128(str) {
+  let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+  for (let i = 0; i < str.length; i++) {
+    const k = str.charCodeAt(i);
+    h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+    h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+    h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+    h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+  }
+  h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+  h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+  h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+  h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+  h1 ^= (h2 ^ h4); h2 ^= (h1 ^ h3); h3 ^= (h1 ^ h2); h4 ^= (h2 ^ h3);
+  return [h1 >>> 0, h2 >>> 0, h3 >>> 0, h4 >>> 0];
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function makeRng(seedStr) {
+  const seeds = cyrb128(String(seedStr || "MAGNET-2026"));
+  return mulberry32(seeds[0]);
+}
+
+const dist2 = (ax, ay, bx, by) => {
+  const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy;
+};
+
+// 从空间站向外的 24 条射线中，至少需要多少条在 430px 内无残骸阻挡
+function openCorridors(wrecks) {
+  const RAYS = 24, NEED = 430;
+  let open = 0;
+  for (let i = 0; i < RAYS; i++) {
+    const ang = (i / RAYS) * Math.PI * 2;
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    let blocked = false;
+    for (const w of wrecks) {
+      // 射线 (t*dx, t*dy) 与圆 (w.x,w.y,w.r) 相交判定
+      const proj = w.x * dx + w.y * dy;
+      if (proj < 0 || proj > NEED) continue;
+      const perp2 = dist2(w.x, w.y, proj * dx, proj * dy);
+      if (perp2 < w.r * w.r) { blocked = true; break; }
+    }
+    if (!blocked) open++;
+  }
+  return open;
+}
+
+function generateWorld(seedStr) {
+  const rng = makeRng(seedStr);
+  const W = CFG.WORLD_R, S = CFG.STATION;
+  const wrecks = [];
+  let guard = 0;
+  while (wrecks.length < CFG.WRECK_COUNT && guard++ < 4000) {
+    const r = 26 + rng() * 34;
+    const ang = rng() * Math.PI * 2;
+    const rad = 300 + rng() * (W - 480);
+    const x = Math.cos(ang) * rad, y = Math.sin(ang) * rad;
+    if (Math.hypot(x, y) + r > W - 60) continue;
+    if (Math.hypot(x - S.x, y - S.y) < 260 + r) continue;
+    let ok = true;
+    for (const w of wrecks) {
+      if (dist2(x, y, w.x, w.y) < (r + w.r + 70) ** 2) { ok = false; break; }
+    }
+    if (!ok) continue;
+    wrecks.push({ x, y, r });
+    if (openCorridors(wrecks) < 6) wrecks.pop();  // 防止空间站被包围
+  }
+
+  // 四块碎片：体积递增，最后一块为大型；周围强制留出操作空间
+  const debris = [];
+  for (let idx = 0; idx < CFG.DEBRIS_RADII.length; idx++) {
+    const r = CFG.DEBRIS_RADII[idx];
+    const mass = CFG.DEBRIS_DENSITY * r * r;
+    let placed = false, tries = 0;
+    while (!placed && tries++ < 3000) {
+      const ang = rng() * Math.PI * 2;
+      const rad = 480 + rng() * (W - 850);
+      const x = Math.cos(ang) * rad, y = Math.sin(ang) * rad;
+      if (Math.hypot(x, y) + r + 120 > W) continue;
+      if (Math.hypot(x - S.x, y - S.y) < S.r + r + 320) continue;
+      let ok = true;
+      for (const w of wrecks) {
+        if (dist2(x, y, w.x, w.y) < (w.r + r + 110) ** 2) { ok = false; break; }
+      }
+      for (const d of debris) {
+        if (dist2(x, y, d.x, d.y) < (d.r + r + 140) ** 2) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const speed = 12 + rng() * 22, va = rng() * Math.PI * 2;
+      debris.push({
+        id: idx, x, y, r, mass,
+        vx: Math.cos(va) * speed, vy: Math.sin(va) * speed,
+        spin: rng() * Math.PI * 2, spinVel: (rng() - 0.5) * 1.6,
+        collected: false, locked: false, trail: []
+      });
+      placed = true;
+    }
+    if (!placed) throw new Error("碎片放置失败，seed=" + seedStr);
+  }
+
+  // 星空视差三层（同样由 seed 决定）
+  const stars = [];
+  const layers = [{ n: 150, par: 0.22, size: 1 }, { n: 110, par: 0.45, size: 1.6 }, { n: 70, par: 0.72, size: 2.3 }];
+  for (const layer of layers) {
+    for (let i = 0; i < layer.n; i++) {
+      stars.push({
+        x: (rng() * 2 - 1) * (W + 500), y: (rng() * 2 - 1) * (W + 500),
+        par: layer.par, s: layer.size * (0.7 + rng() * 0.6), tw: rng() * Math.PI * 2
+      });
+    }
+  }
+
+  // 太阳风暴日程：周期性、方向随机，全部预先确定
+  const storms = [];
+  let t = CFG.STORM.first;
+  while (t < CFG.TIME_LIMIT - 12) {
+    const dur = CFG.STORM.durMin + rng() * (CFG.STORM.durMax - CFG.STORM.durMin);
+    storms.push({ start: t, duration: dur, angle: rng() * Math.PI * 2 });
+    t += dur + CFG.STORM.gapMin + rng() * (CFG.STORM.gapMax - CFG.STORM.gapMin);
+  }
+
+  return { seed: String(seedStr), wrecks, debris, stars, storms, station: { ...S } };
+}
+
+function createGame(world) {
+  const S = CFG.SHIP;
+  const ship = {
+    x: 0, y: 220, vx: 0, vy: 0, angle: -Math.PI / 2, omega: 0,
+    hull: S.hull, fuel: S.fuel, invuln: 0, magnet: false, lockedId: -1,
+    thrusting: false, braking: false, totalMass: S.mass
+  };
+  const state = {
+    world, ship, time: 0, status: "running", // running | won | lost
+    collected: 0, locked: null, events: [],
+    stormActive: null, stormWarn: null, fuelEmptyAt: -1, shake: 0
+  };
+
+  function emit(type, data) { state.events.push(Object.assign({ type }, data || {})); }
+
+  function currentStorm(t) {
+    const warn = CFG.STORM.warn;
+    for (const st of world.storms) {
+      if (t >= st.start && t < st.start + st.duration) return { kind: "active", storm: st };
+      if (t >= st.start - warn && t < st.start) return { kind: "warn", storm: st };
+    }
+    return null;
+  }
+
+  function acquireLock() {
+    let best = -1, bestD = S.magnetRange * S.magnetRange;
+    for (const d of world.debris) {
+      if (d.collected) continue;
+      const dd = dist2(ship.x, ship.y, d.x, d.y);
+      if (dd < bestD) { bestD = dd; best = d.id; }
+    }
+    if (best >= 0) {
+      ship.lockedId = best;
+      const d = world.debris[best];
+      d.locked = true;
+      state.locked = d;
+      // 预拉到绳长，避免锁定瞬间的首帧超调
+      const lx = d.x - ship.x, ly = d.y - ship.y;
+      const ll = Math.hypot(lx, ly) || 1;
+      if (ll > CFG.TETHER.rest) {
+        const k = CFG.TETHER.rest / ll;
+        d.x = ship.x + lx * k; d.y = ship.y + ly * k;
+      }
+      emit("lock", { id: best, r: d.r });
+    }
+  }
+
+  function releaseLock(silent) {
+    if (ship.lockedId < 0) return;
+    const d = world.debris[ship.lockedId];
+    d.locked = false;
+    if (!silent) emit("unlock", { id: d.id });
+    ship.lockedId = -1;
+    state.locked = null;
+  }
+
+  // 位置动力学绳索：不压缩（只能拉不能推），质量越大被牵引的一方运动越迟缓
+  function solveTether() {
+    const d = state.locked;
+    if (!d) return;
+    const rest = CFG.TETHER.rest;
+    for (let it = 0; it < CFG.TETHER.iterations; it++) {
+      const dx = d.x - ship.x, dy = d.y - ship.y;
+      const len = Math.hypot(dx, dy);
+      if (len <= rest || len < 1e-6) continue;
+      const nx = dx / len, ny = dy / len, stretch = len - rest;
+      const wShip = 1 / ship.totalMass, wDeb = 1 / d.mass;
+      const wSum = wShip + wDeb;
+      const bias = stretch * CFG.TETHER.bias;
+      const cs = bias * (wShip / wSum), cd = bias * (wDeb / wSum);
+      ship.x += nx * cs; ship.y += ny * cs;
+      d.x -= nx * cd; d.y -= ny * cd;
+      const rvx = d.vx - ship.vx, rvy = d.vy - ship.vy;
+      const vn = rvx * nx + rvy * ny;
+      if (vn > 0) {
+        const j = vn / wSum * (1 - CFG.TETHER.damping);
+        ship.vx += nx * j * wShip; ship.vy += ny * j * wShip;
+        d.vx -= nx * j * wDeb; d.vy -= ny * j * wDeb;
+      }
+    }
+    // 硬钳制：无论相对速度多大，绳长不允许超过 rest（冲量在迭代中已吸收大部分）
+    const fdx = d.x - ship.x, fdy = d.y - ship.y;
+    const flen = Math.hypot(fdx, fdy);
+    if (flen > rest) {
+      const fnx = fdx / flen, fny = fdy / flen, over = flen - rest;
+      const wShip = 1 / ship.totalMass, wDeb = 1 / d.mass;
+      const wSum = wShip + wDeb;
+      ship.x += fnx * over * (wShip / wSum);
+      ship.y += fny * over * (wShip / wSum);
+      d.x -= fnx * over * (wDeb / wSum);
+      d.y -= fny * over * (wDeb / wSum);
+    }
+  }
+
+  function circleHit(obj, r, restitution, damageFactor) {
+    const dx = ship.x - obj.x, dy = ship.y - obj.y;
+    const minDist = r + S.radius;
+    const d = Math.hypot(dx, dy);
+    if (d >= minDist || d < 1e-6) return;
+    const nx = dx / d, ny = dy / d;
+    const pen = minDist - d;
+    ship.x += nx * pen; ship.y += ny * pen;
+    const vn = ship.vx * nx + ship.vy * ny;
+    if (vn < 0) {
+      const impact = -vn;
+      ship.vx -= (1 + restitution) * vn * nx;
+      ship.vy -= (1 + restitution) * vn * ny;
+      if (damageFactor && ship.invuln <= 0 && impact > 80) {
+        const dmg = Math.min(28, (impact - 80) * damageFactor);
+        ship.hull = Math.max(0, ship.hull - dmg);
+        ship.invuln = S.hitInvuln;
+        state.shake = Math.min(14, 4 + impact / 26);
+        emit("hit", { x: ship.x, y: ship.y, impact, dmg });
+      }
+    }
+  }
+
+  function debrisBounce(d, obj, r, restitution) {
+    const dx = d.x - obj.x, dy = d.y - obj.y;
+    const minDist = r + d.r, dist = Math.hypot(dx, dy);
+    if (dist >= minDist || dist < 1e-6) return;
+    const nx = dx / dist, ny = dy / dist;
+    d.x += nx * (minDist - dist);
+    const vn = d.vx * nx + d.vy * ny;
+    if (vn < 0) {
+      d.vx -= (1 + restitution) * vn * nx;
+      d.vy -= (1 + restitution) * vn * ny;
+      d.spinVel += (Math.random() - 0.5) * 2;
+    }
+  }
+
+  function damageHull(amount, x, y) {
+    if (ship.invuln > 0) return;
+    ship.hull = Math.max(0, ship.hull - amount);
+    ship.invuln = S.hitInvuln;
+    state.shake = Math.min(16, state.shake + amount / 6);
+    emit("hit", { x, y, impact: amount * 4, dmg: amount });
+  }
+
+  function step(dt, input) {
+    if (state.status !== "running") return state.events;
+    state.events.length = 0;
+    state.time += dt;
+    if (ship.invuln > 0) ship.invuln -= dt;
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 22);
+
+    // 风暴状态
+    const sm = currentStorm(state.time);
+    state.stormActive = sm && sm.kind === "active" ? sm.storm : null;
+    state.stormWarn = sm && sm.kind === "warn" ? sm.storm : null;
+    if (ship.fuel <= 0 && state.fuelEmptyAt < 0) state.fuelEmptyAt = state.time;
+
+    // 磁力开关与锁定
+    const wantMagnet = !!input.magnet && ship.fuel > 0;
+    if (!wantMagnet) {
+      releaseLock(false);
+    } else if (ship.lockedId < 0 || !state.locked || state.locked.collected) {
+      acquireLock();
+    }
+    ship.magnet = wantMagnet;
+    if (wantMagnet) ship.fuel = Math.max(0, ship.fuel - S.fuelMagnet * dt);
+
+    // 有效质量 = 船 + 锁定碎片
+    const locked = state.locked;
+    ship.totalMass = S.mass + (locked ? locked.mass : 0);
+
+    const SUB = 2, h = dt / SUB;
+    for (let sub = 0; sub < SUB; sub++) integrate(h, input);
+    resolveEndFrame();
+    return state.events;
+  }
+
+  function integrate(dt, input) {
+    // 转向：转动惯量随有效质量上升，转向阻力同步增大 => 拖重物时转身明显发沉
+    const turn = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const inertia = S.inertia * (0.55 + 0.45 * ship.totalMass);
+    const dragK = S.angDrag * (0.6 + 0.55 * ship.totalMass);
+    ship.omega += (turn * S.turnTorque / inertia - dragK * ship.omega) * dt;
+    ship.angle += ship.omega * dt;
+
+    // 推进 / 反推
+    ship.thrusting = input.thrust && ship.fuel > 0;
+    ship.braking = input.brake && ship.fuel > 0;
+    if (ship.thrusting) {
+      const a = S.thrust / ship.totalMass;
+      ship.vx += Math.cos(ship.angle) * a * dt;
+      ship.vy += Math.sin(ship.angle) * a * dt;
+      ship.fuel = Math.max(0, ship.fuel - S.fuelThrust * dt);
+      emit("thrust", { x: ship.x, y: ship.y, angle: ship.angle });
+    }
+    if (ship.braking) {
+      const a = S.brake / ship.totalMass;
+      ship.vx -= Math.cos(ship.angle) * a * dt;
+      ship.vy -= Math.sin(ship.angle) * a * dt;
+      ship.fuel = Math.max(0, ship.fuel - S.fuelBrake * dt);
+      emit("thrust", { x: ship.x, y: ship.y, angle: ship.angle + Math.PI, reverse: true });
+    }
+
+    // 线性阻尼（极弱，保持惯性；越重漂得越久）与太阳风暴推力
+    const dampK = CFG.SHIP.linDrag * (1.35 - 0.35 * ship.totalMass);
+    ship.vx *= Math.exp(-dampK * dt);
+    ship.vy *= Math.exp(-dampK * dt);
+    if (state.stormActive) {
+      const st = state.stormActive;
+      ship.vx += Math.cos(st.angle) * CFG.STORM.accelShip * dt;
+      ship.vy += Math.sin(st.angle) * CFG.STORM.accelShip * dt;
+    }
+    ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+
+    // 碎片：漂移、风暴、绳索、碰撞
+    for (const d of world.debris) {
+      if (d.collected) continue;
+      d.spin += d.spinVel * dt;
+      if (state.stormActive) {
+        const st = state.stormActive;
+        d.vx += Math.cos(st.angle) * CFG.STORM.accelDebris * dt;
+        d.vy += Math.sin(st.angle) * CFG.STORM.accelDebris * dt;
+      }
+      d.vx *= Math.exp(-0.08 * dt); d.vy *= Math.exp(-0.08 * dt);
+      const dsp = Math.hypot(d.vx, d.vy);
+      const dmax = 160;
+      if (dsp > dmax) { d.vx = d.vx / dsp * dmax; d.vy = d.vy / dsp * dmax; }
+      d.x += d.vx * dt; d.y += d.vy * dt;
+      for (const w of world.wrecks) debrisBounce(d, w, w.r, 0.4);
+      const dd = Math.hypot(d.x, d.y);
+      if (dd + d.r > CFG.WORLD_R) {
+        const nx = -d.x / dd, ny = -d.y / dd;
+        d.x = nx * (CFG.WORLD_R - d.r); d.y = ny * (CFG.WORLD_R - d.r);
+        const vn = d.vx * nx + d.vy * ny;
+        if (vn < 0) { d.vx -= 0.9 * vn * nx; d.vy -= 0.9 * vn * ny; }
+      }
+      if (d.trail.length === 0 || dist2(d.trail[d.trail.length - 1].x, d.trail[d.trail.length - 1].y, d.x, d.y) > 900) {
+        d.trail.push({ x: d.x, y: d.y });
+        if (d.trail.length > 90) d.trail.shift();
+      }
+    }
+    solveTether();
+    if (state.locked) clampTether();
+  }
+
+  function clampTether() {
+    const d = state.locked, rest = CFG.TETHER.rest;
+    const dx = d.x - ship.x, dy = d.y - ship.y;
+    const len = Math.hypot(dx, dy);
+    if (len <= rest) return;
+    const nx = dx / len, ny = dy / len, over = len - rest;
+    const wShip = 1 / ship.totalMass, wDeb = 1 / d.mass;
+    const wSum = wShip + wDeb;
+    ship.x += nx * over * (wShip / wSum); ship.y += ny * over * (wShip / wSum);
+    d.x -= nx * over * (wDeb / wSum); d.y -= ny * over * (wDeb / wSum);
+  }
+
+  function resolveEndFrame() {
+    // 飞船碰撞：残骸 / 边界 / 空间站 / 自由碎片
+    for (const w of world.wrecks) circleHit(w, w.r, 0.5, 0.2);
+    const sd = Math.hypot(ship.x, ship.y);
+    if (sd + S.radius > CFG.WORLD_R) {
+      const nx = -ship.x / sd, ny = -ship.y / sd;
+      ship.x = nx * (CFG.WORLD_R - S.radius); ship.y = ny * (CFG.WORLD_R - S.radius);
+      const vn = ship.vx * nx + ship.vy * ny;
+      if (vn < 0) {
+        const impact = -vn;
+        ship.vx -= 1.5 * vn * nx; ship.vy -= 1.5 * vn * ny;
+        if (impact > 120) damageHull(Math.min(35, (impact - 120) * 0.18), ship.x, ship.y);
+      }
+    }
+    const stn = world.station;
+    const toStation = Math.hypot(ship.x - stn.x, ship.y - stn.y);
+    circleHit(stn, stn.r, 0.45, 0.22);
+    for (const d of world.debris) {
+      if (d.collected || d.id === ship.lockedId) continue;
+      circleHit(d, d.r, 0.5, 0);
+    }
+
+    // 停靠判定：进入对接圈且速度可控即交付锁定碎片
+    const speed = Math.hypot(ship.vx, ship.vy);
+    if (toStation < stn.dockR && speed < S.dockSpeed) {
+      const locked = state.locked;
+      if (locked) {
+        locked.collected = true;
+        state.collected++;
+        emit("deposit", { id: locked.id, r: locked.r });
+        releaseLock(true);
+        if (state.collected >= world.debris.length) {
+          state.status = "won";
+          emit("win", {});
+        }
+      }
+    }
+
+    // 失败判定
+    if (ship.hull <= 0) {
+      state.status = "lost";
+      emit("lose", { reason: "船体耐久归零，拖船解体" });
+    }
+    if (state.time >= CFG.TIME_LIMIT && state.status === "running") {
+      state.status = "lost";
+      emit("lose", { reason: "任务时限已到，碎片仍滞留轨道" });
+    }
+    if (ship.fuel <= 0 && state.status === "running") {
+      const adrift = state.time - state.fuelEmptyAt;
+      if (adrift > CFG.FUEL_GRACE && toStation >= stn.dockR) {
+        state.status = "lost";
+        emit("lose", { reason: "燃料耗尽且未能漂回空间站" });
+      }
+    }
+  }
+
+  return { state, step, releaseLock };
+}
+/* ===ENGINE_END=== */
+
+/* ===AUDIO=== 纯 Web Audio 合成，无外部资源 */
+const AudioEngine = (() => {
+  let ctx = null, master = null, muted = false;
+  let thrustNodes = null, windNodes = null, humTimer = 0;
+
+  function ensure() {
+    if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = 0.55;
+    master.connect(ctx.destination);
+  }
+
+  function tone({ freq = 440, end = freq, dur = 0.15, type = "sine", vol = 0.2, attack = 0.005, decay = null }) {
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(20, end), t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(master);
+    osc.start(t); osc.stop(t + dur + 0.02);
+  }
+
+  function noiseBurst({ dur = 0.25, vol = 0.3, filterFreq = 1200, type = "lowpass" }) {
+    if (!ctx || muted) return;
+    const t = ctx.currentTime;
+    const len = Math.max(1, (ctx.sampleRate * dur) | 0);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const filter = ctx.createBiquadFilter(); filter.type = type; filter.frequency.value = filterFreq;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(filter); filter.connect(g); g.connect(master);
+    src.start(t);
+  }
+
+  return {
+    init() { ensure(); },
+    setMuted(m) {
+      muted = m;
+      if (master) master.gain.value = m ? 0 : 0.55;
+    },
+    isMuted() { return muted; },
+    click() { tone({ freq: 620, end: 880, dur: 0.08, type: "triangle", vol: 0.15 }); },
+    lock() {
+      tone({ freq: 300, end: 720, dur: 0.18, type: "square", vol: 0.12 });
+      setTimeout(() => tone({ freq: 720, end: 980, dur: 0.12, type: "sine", vol: 0.1 }), 90);
+    },
+    unlock() { tone({ freq: 700, end: 240, dur: 0.16, type: "square", vol: 0.1 }); },
+    deposit() {
+      [523, 659, 784, 1047].forEach((f, i) =>
+        setTimeout(() => tone({ freq: f, dur: 0.22, type: "triangle", vol: 0.16 }), i * 95));
+    },
+    hit(impact = 200) {
+      const v = Math.min(0.5, 0.18 + impact / 600);
+      noiseBurst({ dur: 0.3, vol: v, filterFreq: 900 });
+      tone({ freq: 160, end: 50, dur: 0.28, type: "sawtooth", vol: v * 0.7 });
+    },
+    lose() {
+      [420, 340, 260, 170].forEach((f, i) =>
+        setTimeout(() => tone({ freq: f, end: f * 0.8, dur: 0.4, type: "sawtooth", vol: 0.2 }), i * 220));
+    },
+    win() {
+      [523, 659, 784, 1047, 1319].forEach((f, i) =>
+        setTimeout(() => tone({ freq: f, dur: 0.35, type: "triangle", vol: 0.18 }), i * 130));
+    },
+    startThrust() {
+      if (!ctx || muted || thrustNodes) return;
+      const osc = ctx.createOscillator(), osc2 = ctx.createOscillator();
+      const g = ctx.createGain(), filter = ctx.createBiquadFilter();
+      osc.type = "sawtooth"; osc.frequency.value = 58;
+      osc2.type = "sine"; osc2.frequency.value = 92;
+      filter.type = "lowpass"; filter.frequency.value = 320;
+      g.gain.value = 0.0;
+      g.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.06);
+      osc.connect(filter); osc2.connect(filter); filter.connect(g); g.connect(master);
+      osc.start(); osc2.start();
+      thrustNodes = { osc, osc2, g };
+    },
+    stopThrust() {
+      if (!thrustNodes) return;
+      const { osc, osc2, g } = thrustNodes;
+      g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.08);
+      setTimeout(() => { try { osc.stop(); osc2.stop(); } catch (e) {} }, 120);
+      thrustNodes = null;
+    },
+    startWind() {
+      if (!ctx || muted || windNodes) return;
+      const len = ctx.sampleRate * 2;
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      const filter = ctx.createBiquadFilter(); filter.type = "bandpass"; filter.frequency.value = 480; filter.Q.value = 0.6;
+      const g = ctx.createGain(); g.gain.value = 0;
+      g.gain.linearRampToValueAtTime(0.14, ctx.currentTime + 0.5);
+      src.connect(filter); filter.connect(g); g.connect(master);
+      src.start();
+      windNodes = { src, g, filter };
+    },
+    stopWind() {
+      if (!windNodes) return;
+      const { src, g } = windNodes;
+      g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+      setTimeout(() => { try { src.stop(); } catch (e) {} }, 450);
+      windNodes = null;
+    },
+    magnetHum(dt, active) {
+      if (!ctx || muted || !active) return;
+      humTimer -= dt;
+      if (humTimer <= 0) {
+        tone({ freq: 1180, end: 1240, dur: 0.07, type: "sine", vol: 0.035 });
+        humTimer = 0.14;
+      }
+    }
+  };
+})();
+/* ===AUDIO_END=== */
+
+/* ===RENDER=== Canvas 2D 表现层 */
+const Renderer = (() => {
+  let canvas, ctx, W = 0, H = 0, dpr = 1;
+  const cam = { x: 0, y: 0, zoom: 1 };
+  let particles = [];
+
+  function init(cv) {
+    canvas = cv;
+    ctx = canvas.getContext("2d");
+    resize();
+    window.addEventListener("resize", resize);
+  }
+
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function burst(x, y, angle, kind) {
+    const n = kind === "hit" ? 18 : 3;
+    for (let i = 0; i < n; i++) {
+      const spread = kind === "hit" ? Math.PI * 2 : 0.5;
+      const a = angle + (Math.random() - 0.5) * spread;
+      const sp = kind === "hit" ? 60 + Math.random() * 220 : 70 + Math.random() * 90;
+      particles.push({
+        x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: kind === "hit" ? 0.5 : 0.35, max: kind === "hit" ? 0.5 : 0.35,
+        size: kind === "hit" ? 2 + Math.random() * 3 : 1.5 + Math.random() * 2,
+        color: kind === "hit" ? "#ffb066" : (kind === "reverse" ? "#7df9ff" : "#ffd27d")
+      });
+    }
+    if (particles.length > 400) particles.splice(0, particles.length - 400);
+  }
+
+  function updateParticles(dt) {
+    for (const p of particles) {
+      p.life -= dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vx *= 0.96; p.vy *= 0.96;
+    }
+    particles = particles.filter(p => p.life > 0);
+  }
+
+  function clearParticles() { particles = []; }
+
+  function worldToScreen(x, y) {
+    return [(x - cam.x) * cam.zoom + W / 2, (y - cam.y) * cam.zoom + H / 2];
+  }
+
+  function drawStars(world, time) {
+    ctx.fillStyle = "#04060e";
+    ctx.fillRect(0, 0, W, H);
+    // 远景星云扫掠
+    const g = ctx.createRadialGradient(W * 0.7, H * 0.25, 40, W * 0.7, H * 0.25, 620);
+    g.addColorStop(0, "rgba(70,60,160,0.16)");
+    g.addColorStop(1, "rgba(4,6,14,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    for (const s of world.stars) {
+      const px = (s.x - cam.x * s.par) * cam.zoom + W / 2;
+      const py = (s.y - cam.y * s.par) * cam.zoom + H / 2;
+      if (px < -10 || py < -10 || px > W + 10 || py > H + 10) continue;
+      const tw = 0.55 + 0.45 * Math.sin(time * 2 + s.tw);
+      ctx.globalAlpha = tw * (0.4 + s.par * 0.6);
+      ctx.fillStyle = s.par > 0.6 ? "#cfe6ff" : "#8fa8d8";
+      ctx.fillRect(px, py, s.s, s.s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBoundary() {
+    const [cx, cy] = worldToScreen(0, 0);
+    const r = CFG.WORLD_R * cam.zoom;
+    ctx.strokeStyle = "rgba(110,170,255,0.5)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([14, 10]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(80,140,255,0.12)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - 12, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawStation(station, time) {
+    const [x, y] = worldToScreen(station.x, station.y);
+    const s = cam.zoom;
+    ctx.save();
+    ctx.translate(x, y);
+    // 对接圈
+    ctx.strokeStyle = "rgba(120,230,255,0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 12]);
+    ctx.lineDashOffset = -time * 30;
+    ctx.beginPath();
+    ctx.arc(0, 0, station.dockR * s, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // 站体光环
+    const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, station.r * 1.8 * s);
+    glow.addColorStop(0, "rgba(110,200,255,0.5)");
+    glow.addColorStop(1, "rgba(110,200,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, 0, station.r * 1.8 * s, 0, Math.PI * 2); ctx.fill();
+    // 核心
+    ctx.rotate(time * 0.25);
+    ctx.fillStyle = "#dff4ff";
+    ctx.strokeStyle = "#5fb8ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(-station.r * 0.35 * s, -station.r * 0.35 * s, station.r * 0.7 * s, station.r * 0.7 * s);
+    ctx.fill(); ctx.stroke();
+    // 旋转环与太阳能板
+    ctx.strokeStyle = "#7fd0ff";
+    ctx.lineWidth = 3 * s;
+    ctx.beginPath(); ctx.ellipse(0, 0, station.r * s, station.r * 0.45 * s, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = "#2b6fb8";
+    for (const dir of [-1, 1]) {
+      ctx.fillRect(dir * station.r * 0.55 * s - 14 * s, -7 * s, 28 * s, 14 * s);
+    }
+    ctx.restore();
+  }
+
+  function drawWrecks(world) {
+    for (const w of world.wrecks) {
+      const [x, y] = worldToScreen(w.x, w.y);
+      const r = w.r * cam.zoom;
+      ctx.fillStyle = "#2a3350";
+      ctx.strokeStyle = "#46557f";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const seed = (w.x * 13 + w.y * 7) % 7;
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        const rr = r * (0.78 + 0.28 * Math.sin(i * 3 + seed));
+        const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(120,150,210,0.5)";
+      ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.25, r * 0.18, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawDebris(world) {
+    for (const d of world.debris) {
+      if (d.collected) continue;
+      // 轨迹
+      if (d.trail.length > 1) {
+        ctx.strokeStyle = d.locked ? "rgba(120,230,255,0.4)" : "rgba(140,160,220,0.22)";
+        ctx.lineWidth = d.locked ? 2 : 1;
+        ctx.beginPath();
+        d.trail.forEach((p, i) => {
+          const [tx, ty] = worldToScreen(p.x, p.y);
+          if (i === 0) ctx.moveTo(tx, ty); else ctx.lineTo(tx, ty);
+        });
+        const [hx, hy] = worldToScreen(d.x, d.y);
+        ctx.lineTo(hx, hy);
+        ctx.stroke();
+      }
+      const [x, y] = worldToScreen(d.x, d.y);
+      const r = d.r * cam.zoom;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(d.spin);
+      const big = d.r >= 38;
+      ctx.fillStyle = big ? "#6d4a2f" : "#4a4f6b";
+      ctx.strokeStyle = d.locked ? "#7df9ff" : (big ? "#ffb066" : "#9fb4e6");
+      ctx.lineWidth = d.locked ? 3 : 2;
+      ctx.beginPath();
+      const sides = big ? 6 : 5;
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * Math.PI * 2;
+        const rr = r * (0.82 + (i % 2) * 0.2);
+        const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.beginPath(); ctx.moveTo(-r * 0.5, 0); ctx.lineTo(r * 0.5, 0); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  return {
+    init, resize, burst, updateParticles,
+    clearParticles,
+    get cam() { return cam; },
+    get particles() { return particles; },
+    worldToScreen,
+    drawStars, drawBoundary, drawStation, drawWrecks, drawDebris
+  };
+})();
+/* ===RENDER_END=== */
+
+/* ===RENDER2=== */
+Object.assign(Renderer, (() => {
+  let canvas, ctx, W, H;
+  function bind() {
+    canvas = document.getElementById("game");
+    ctx = canvas.getContext("2d");
+    W = () => window.innerWidth; H = () => window.innerHeight;
+  }
+
+  function drawParticles() {
+    const c = Renderer.cam, zoom = c.zoom;
+    for (const p of Renderer.particles) {
+      const [sx, sy] = Renderer.worldToScreen(p.x, p.y);
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(sx, sy, p.size * zoom, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawShip(ship, time) {
+    const c = Renderer.cam;
+    const [x, y] = Renderer.worldToScreen(ship.x, ship.y);
+    const s = c.zoom;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ship.angle);
+    if (ship.invuln > 0 && Math.floor(time * 12) % 2 === 0) ctx.globalAlpha = 0.45;
+    // 船体
+    ctx.fillStyle = "#e8f2ff";
+    ctx.strokeStyle = ship.magnet ? "#7df9ff" : "#5b9bff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(20 * s, 0);
+    ctx.lineTo(-13 * s, 11 * s);
+    ctx.lineTo(-8 * s, 0);
+    ctx.lineTo(-13 * s, -11 * s);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // 驾驶舱
+    ctx.fillStyle = "#3aa0ff";
+    ctx.beginPath(); ctx.arc(3 * s, 0, 4.5 * s, 0, Math.PI * 2); ctx.fill();
+    // 磁吸线圈
+    if (ship.magnet) {
+      ctx.strokeStyle = `rgba(125,249,255,${0.5 + 0.3 * Math.sin(time * 10)})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(-9 * s, 0, 6 * s, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawMagnetRange(ship) {
+    if (!ship.magnet) return;
+    const [x, y] = Renderer.worldToScreen(ship.x, ship.y);
+    const r = CFG.SHIP.magnetRange * Renderer.cam.zoom;
+    ctx.strokeStyle = "rgba(125,249,255,0.18)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 10]);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawTether(ship, locked, time) {
+    if (!locked) return;
+    const [ax, ay] = Renderer.worldToScreen(ship.x, ship.y);
+    const [bx, by] = Renderer.worldToScreen(locked.x, locked.y);
+    const pulse = 0.6 + 0.4 * Math.sin(time * 14);
+    const grad = ctx.createLinearGradient(ax, ay, bx, by);
+    grad.addColorStop(0, `rgba(125,249,255,${pulse})`);
+    grad.addColorStop(1, "rgba(150,120,255,0.9)");
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = "#7df9ff";
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    // 轻微波纹的能量绳
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const nx = -(by - ay), ny = (bx - ax);
+    const nl = Math.hypot(nx, ny) || 1;
+    const wob = Math.sin(time * 18) * 6;
+    ctx.moveTo(ax, ay);
+    ctx.quadraticCurveTo(mx + (nx / nl) * wob, my + (ny / nl) * wob, bx, by);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawStorm(storm, warn, time) {
+    if (!storm) return;
+    const c = Renderer.cam;
+    const dirX = Math.cos(storm.angle), dirY = Math.sin(storm.angle);
+    const alpha = warn ? 0.1 + 0.06 * Math.sin(time * 8) : 0.22;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,150,90,${warn ? 0.4 : 0.7})`;
+    ctx.lineWidth = 2;
+    // 全屏斜向粒子流，相对相机空间运动
+    const span = Math.hypot(W(), H());
+    const perpX = -dirY, perpY = dirX;
+    for (let i = 0; i < 70; i++) {
+      const seed = i * 137.5;
+      const along = ((seed + time * (warn ? 60 : 320)) % span) - span / 2;
+      const off = ((i * 291.7) % span) - span / 2;
+      const sx = W() / 2 + dirX * along + perpX * off;
+      const sy = H() / 2 + dirY * along + perpY * off;
+      ctx.globalAlpha = alpha * (0.5 + 0.5 * ((i * 37) % 10) / 10);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - dirX * 26, sy - dirY * 26);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // 屏幕边缘暖色调
+    const edge = ctx.createRadialGradient(W() / 2, H() / 2, span * 0.3, W() / 2, H() / 2, span * 0.75);
+    edge.addColorStop(0, "rgba(255,120,60,0)");
+    edge.addColorStop(1, `rgba(255,110,60,${warn ? 0.06 : 0.16})`);
+    ctx.fillStyle = edge;
+    ctx.fillRect(0, 0, W(), H());
+    ctx.restore();
+  }
+
+  function drawMinimap(mini, game) {
+    const mctx = mini.getContext("2d");
+    const size = mini.width, half = size / 2, scale = (half - 8) / CFG.WORLD_R;
+    mctx.clearRect(0, 0, size, size);
+    mctx.fillStyle = "rgba(6,12,28,0.75)";
+    mctx.beginPath(); mctx.arc(half, half, half - 1, 0, Math.PI * 2); mctx.fill();
+    mctx.strokeStyle = "rgba(110,170,255,0.5)"; mctx.lineWidth = 1.5;
+    mctx.beginPath(); mctx.arc(half, half, half - 4, 0, Math.PI * 2); mctx.stroke();
+    const px = (x) => half + x * scale, py = (y) => half + y * scale;
+    mctx.fillStyle = "#46557f";
+    for (const w of game.world.wrecks) {
+      mctx.beginPath(); mctx.arc(px(w.x), py(w.y), Math.max(1.5, w.r * scale), 0, Math.PI * 2); mctx.fill();
+    }
+    mctx.fillStyle = "#7df9ff";
+    mctx.fillRect(px(game.world.station.x) - 3, py(game.world.station.y) - 3, 6, 6);
+    for (const d of game.world.debris) {
+      if (d.collected) continue;
+      mctx.fillStyle = d.locked ? "#7df9ff" : (d.r >= 38 ? "#ffb066" : "#9fb4e6");
+      mctx.beginPath(); mctx.arc(px(d.x), py(d.y), 2.5 + d.r * scale * 0.4, 0, Math.PI * 2); mctx.fill();
+    }
+    const sh = game.ship;
+    mctx.save();
+    mctx.translate(px(sh.x), py(sh.y));
+    mctx.rotate(sh.angle);
+    mctx.fillStyle = "#ffffff";
+    mctx.beginPath(); mctx.moveTo(6, 0); mctx.lineTo(-4, 3.5); mctx.lineTo(-4, -3.5); mctx.closePath(); mctx.fill();
+    mctx.restore();
+  }
+
+  function updateCamera(ship, dt) {
+    const c = Renderer.cam;
+    const lookX = ship.x + ship.vx * 0.35;
+    const lookY = ship.y + ship.vy * 0.35;
+    const k = 1 - Math.exp(-4 * dt);
+    c.x += (lookX - c.x) * k;
+    c.y += (lookY - c.y) * k;
+    const targetZoom = Math.max(0.55, Math.min(1, 900 / (300 + Math.hypot(ship.vx, ship.vy))));
+    c.zoom += (targetZoom - c.zoom) * (1 - Math.exp(-2 * dt));
+  }
+
+  bind();
+  return { drawParticles, drawShip, drawTether, drawMagnetRange, drawStorm, drawMinimap, updateCamera };
+})());
+/* ===RENDER2_END=== */
+
+/* ===APP=== 主控：输入、循环、状态机、HUD */
+(() => {
+  const canvas = document.getElementById("game");
+  const mini = document.getElementById("minimap");
+  const ui = {
+    hullFill: document.getElementById("hullFill"),
+    fuelFill: document.getElementById("fuelFill"),
+    hullText: document.getElementById("hullText"),
+    fuelText: document.getElementById("fuelText"),
+    fragText: document.getElementById("fragText"),
+    timeText: document.getElementById("timeText"),
+    seedLine: document.getElementById("seed-line"),
+    warn: document.getElementById("storm-warn"),
+    toast: document.getElementById("toast"),
+    start: document.getElementById("overlay-start"),
+    pause: document.getElementById("overlay-pause"),
+    lose: document.getElementById("overlay-lose"),
+    win: document.getElementById("overlay-win"),
+    loseReason: document.getElementById("loseReason"),
+    loseStats: document.getElementById("loseStats"),
+    winStats: document.getElementById("winStats"),
+    seedInput: document.getElementById("seedInput")
+  };
+
+  let game = null, world = null, mode = "menu"; // menu | playing | paused | over
+  let last = 0, toastTimer = 0, lastWind = false, lastWarn = false, lastActive = false;
+  const keys = Object.create(null);
+
+  function showToast(text, color = "#8ee6ff") {
+    ui.toast.textContent = text;
+    ui.toast.style.color = color;
+    ui.toast.style.opacity = 1;
+    toastTimer = 2.2;
+  }
+
+  function startGame() {
+    const seed = (ui.seedInput.value || "MAGNET-2026").trim();
+    world = generateWorld(seed);
+    game = createGame(world);
+    ui.seedLine.textContent = "SEED · " + seed;
+    mode = "playing";
+    Renderer.clearParticles();
+    lastWind = lastWarn = lastActive = false;
+    AudioEngine.stopThrust(); AudioEngine.stopWind();
+    [ui.start, ui.pause, ui.lose, ui.win].forEach(o => o.classList.add("hidden"));
+    AudioEngine.init();
+    AudioEngine.click();
+    last = performance.now();
+    showToast("任务开始：回收 4 块碎片");
+  }
+
+  function togglePause() {
+    if (mode === "playing") {
+      mode = "paused";
+      ui.pause.classList.remove("hidden");
+      AudioEngine.stopThrust(); AudioEngine.stopWind();
+    } else if (mode === "paused") {
+      mode = "playing";
+      ui.pause.classList.add("hidden");
+      last = performance.now();
+    }
+  }
+
+  function endGame(events) {
+    const loseEv = events.find(e => e.type === "lose");
+    const winEv = events.find(e => e.type === "win");
+    AudioEngine.stopThrust(); AudioEngine.stopWind();
+    const s = game.state;
+    const stats =
+      `回收碎片 <b>${s.collected}/4</b> · 剩余船体 <b>${Math.round(s.ship.hull)}</b>` +
+      ` · 剩余燃料 <b>${Math.round(s.ship.fuel)}</b> · 用时 <b>${s.time.toFixed(1)}s</b>`;
+    if (loseEv) {
+      mode = "over";
+      ui.loseReason.textContent = loseEv.reason;
+      ui.loseStats.innerHTML = stats;
+      ui.lose.classList.remove("hidden");
+      AudioEngine.lose();
+    } else if (winEv) {
+      mode = "over";
+      ui.winStats.innerHTML = stats;
+      ui.win.classList.remove("hidden");
+      AudioEngine.win();
+    }
+  }
+
+  function handleEvents(events) {
+    const s = game.state;
+    for (const e of events) {
+      switch (e.type) {
+        case "thrust":
+          Renderer.burst(e.x, e.y, e.angle, e.reverse ? "reverse" : "thrust");
+          break;
+        case "lock":
+          AudioEngine.lock();
+          showToast(e.r >= 38 ? "锁定大型碎片：质量骤增，小心惯性！" : "磁力锁定碎片", "#7df9ff");
+          break;
+        case "unlock": AudioEngine.unlock(); break;
+        case "deposit":
+          AudioEngine.deposit();
+          showToast(`碎片已对接回收（${s.collected}/4）`, "#8effb0");
+          break;
+        case "hit":
+          AudioEngine.hit(e.impact);
+          showToast("碰撞！船体受损 -" + Math.round(e.dmg), "#ff9a9a");
+          break;
+      }
+    }
+  }
+
+  function readInput() {
+    return {
+      thrust: !!keys.KeyW,
+      brake: !!keys.KeyS,
+      left: !!keys.KeyA,
+      right: !!keys.KeyD,
+      magnet: !!keys.Space
+    };
+  }
+
+  function updateHud() {
+    const s = game.state, sh = s.ship;
+    ui.hullFill.style.width = Math.max(0, sh.hull) + "%";
+    ui.fuelFill.style.width = Math.max(0, (sh.fuel / CFG.SHIP.fuel) * 100) + "%";
+    ui.hullText.textContent = Math.round(sh.hull);
+    ui.fuelText.textContent = Math.round(sh.fuel);
+    ui.fragText.textContent = `${s.collected}/4`;
+    ui.timeText.textContent = Math.max(0, Math.ceil(CFG.TIME_LIMIT - s.time));
+    if (s.stormWarn) {
+      ui.warn.style.display = "block";
+      ui.warn.textContent = "太阳风暴预警";
+    } else if (s.stormActive) {
+      ui.warn.style.display = "block";
+      ui.warn.textContent = "太阳风暴冲击中";
+    } else {
+      ui.warn.style.display = "none";
+    }
+  }
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000 || 0);
+    last = now;
+    if (mode !== "playing" || !game) {
+      if (world) renderFrame(dt, true);
+      return;
+    }
+    const input = readInput();
+    const events = game.step(dt, input);
+    handleEvents(events);
+
+    // 推进器与风暴的持续音
+    if (game.state.ship.thrusting || game.state.ship.braking) AudioEngine.startThrust();
+    else AudioEngine.stopThrust();
+    AudioEngine.magnetHum(dt, game.state.ship.magnet);
+    const windOn = !!game.state.stormActive;
+    if (windOn && !lastWind) AudioEngine.startWind();
+    if (!windOn && lastWind) AudioEngine.stopWind();
+    lastWind = windOn;
+    if (game.state.stormWarn && !lastWarn) showToast("太阳风暴即将来袭，注意漂移！", "#ffb066");
+    if (game.state.stormActive && !lastActive) showToast("太阳风暴冲击中", "#ff8a66");
+    lastWarn = !!game.state.stormWarn;
+    lastActive = !!game.state.stormActive;
+
+    updateHud();
+    renderFrame(dt, false);
+    if (toastTimer > 0) {
+      toastTimer -= dt;
+      if (toastTimer <= 0) ui.toast.style.opacity = 0;
+    }
+    if (game.state.status !== "running") endGame(events);
+  }
+
+  function renderFrame(dt, idle) {
+    const s = game ? game.state : null;
+    Renderer.updateParticles(dt);
+    if (!s) return;
+    Renderer.updateCamera(s.ship, idle ? 0 : dt);
+    if (s.shake > 0) {
+      const c = Renderer.cam;
+      c.x += (Math.random() - 0.5) * s.shake / c.zoom;
+      c.y += (Math.random() - 0.5) * s.shake / c.zoom;
+    }
+    Renderer.drawStars(world, performance.now() / 1000);
+    Renderer.drawBoundary();
+    Renderer.drawWrecks(world);
+    Renderer.drawDebris(world);
+    Renderer.drawStation(world.station, performance.now() / 1000);
+    Renderer.drawMagnetRange(s.ship);
+    Renderer.drawTether(s.ship, s.locked, performance.now() / 1000);
+    Renderer.drawParticles();
+    Renderer.drawShip(s.ship, performance.now() / 1000);
+    const storm = s.stormActive || s.stormWarn;
+    Renderer.drawStorm(storm, !!s.stormWarn, performance.now() / 1000);
+    Renderer.drawMinimap(mini, { world, ship: s.ship });
+  }
+
+  // 输入
+  window.addEventListener("keydown", (e) => {
+    if (["Space", "KeyW", "KeyA", "KeyS", "KeyD"].includes(e.code)) e.preventDefault();
+    keys[e.code] = true;
+    if (e.code === "KeyP" && (mode === "playing" || mode === "paused")) togglePause();
+    if (e.code === "KeyR" && mode !== "menu") startGame();
+    if (e.code === "KeyM") {
+      AudioEngine.setMuted(!AudioEngine.isMuted());
+      showToast(AudioEngine.isMuted() ? "已静音" : "声音开启");
+    }
+    if (e.code === "Enter" && mode === "menu") startGame();
+  });
+  window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+  document.getElementById("startBtn").addEventListener("click", startGame);
+  document.getElementById("resumeBtn").addEventListener("click", togglePause);
+  document.getElementById("pauseBtn").addEventListener("click", () => {
+    if (mode === "playing" || mode === "paused") togglePause();
+  });
+  ["restartBtn1", "retryBtn", "winRetryBtn"].forEach(id =>
+    document.getElementById(id).addEventListener("click", startGame));
+
+  Renderer.init(canvas);
+  world = generateWorld("MAGNET-2026");
+  game = createGame(world);
+  requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });
+})();
+/* ===APP_END=== */
+</script>
+</body>
+</html>
