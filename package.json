@@ -1,0 +1,13 @@
+{
+  "name": "harbor-swing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A physics-driven Canvas harbor crane game",
+  "scripts": {
+    "start": "python3 -m http.server 4186",
+    "verify": "node tests/verify-lift.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

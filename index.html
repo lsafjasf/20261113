@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09151c" />
+    <title>潮汐吊装 · Harbor Swing</title>
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./assets/fonts/index.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <canvas id="game" width="1600" height="900" aria-label="港口吊机游戏画面"></canvas>
+
+      <section id="start-screen" class="overlay start-screen">
+        <div class="start-copy">
+          <p class="eyebrow">PORT AUTHORITY · NIGHT SHIFT</p>
+          <h1>潮汐<span>吊装</span></h1>
+          <p class="lede">海风正在加强。把六只货箱放进对应的编号泊位，别让摆动把你拖进海里。</p>
+          <div class="start-actions">
+            <button id="start-button" class="primary" type="button">开始吊装 <kbd>Enter</kbd></button>
+            <p class="hint">建议开启声音 · 120 秒限时</p>
+          </div>
+        </div>
+        <div class="start-controls" aria-label="操作说明">
+          <div><kbd>A</kbd><kbd>D</kbd><span>旋转吊臂</span></div>
+          <div><kbd>W</kbd><kbd>S</kbd><span>移动小车</span></div>
+          <div><kbd class="wide">SPACE</kbd><span>下钩 / 收钩</span></div>
+        </div>
+      </section>
+
+      <section id="end-screen" class="overlay end-screen is-hidden" aria-live="polite">
+        <div class="result-card">
+          <p id="end-kicker" class="eyebrow">SHIFT COMPLETE</p>
+          <h2 id="end-title">作业完成</h2>
+          <p id="end-detail" class="lede"></p>
+          <div id="end-stats" class="end-stats"></div>
+          <button id="restart-button" class="primary" type="button">再干一班 <kbd>R</kbd></button>
+        </div>
+      </section>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      <div class="scanlines" aria-hidden="true"></div>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
