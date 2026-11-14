@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%2307100d' stroke='%23e1b875'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e1b875'/%3E%3C/svg%3E">
+  <title>零点电台 · 声学审计</title>
+  <style>
+    @font-face { font-family: "Zero Radio Sans"; src: url("./assets/fonts/NotoSansSC-Regular.woff2") format("woff2"); font-weight: 400; }
+    @font-face { font-family: "Zero Radio Sans"; src: url("./assets/fonts/NotoSansSC-SemiBold.woff2") format("woff2"); font-weight: 600; }
+    :root { color-scheme: dark; font-family: "Zero Radio Sans", "Noto Sans CJK SC", "Noto Sans SC", sans-serif; }
+    body { margin: 0; background: #07100d; color: #c6d8cd; padding: 30px; }
+    h1 { color: #d8b77a; letter-spacing: .14em; margin: 0 0 8px; }
+    .sub { color: #678377; margin-bottom: 24px; }
+    main { display: grid; grid-template-columns: 330px 1fr; gap: 18px; max-width: 1180px; }
+    .panel { border: 1px solid #264238; background: #0b1713; padding: 18px; }
+    .panel h2 { font-size: 13px; letter-spacing: .14em; color: #83aaa0; margin: 0 0 14px; }
+    button, select { background: #12231c; border: 1px solid #35554a; color: #c7dfd4; padding: 9px 12px; margin: 3px; cursor: pointer; font-family: inherit; }
+    button:hover { border-color: #d8b77a; color: #f1d6a1; }
+    .quadrants { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .meter { margin: 12px 0; padding: 10px; background: #08120f; border: 1px solid #1c362c; }
+    .meter span { display: inline-block; min-width: 150px; color: #7da194; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; border-bottom: 1px solid #20382f; padding: 9px 8px; vertical-align: top; }
+    th { color: #78998b; font-weight: 500; }
+    .pass { color: #75d8bd; } .fail { color: #e7a36c; } .wait { color: #7b8f86; }
+    code { color: #d8b77a; font-size: 12px; }
+    #log { margin-top: 14px; font: 12px/1.6 "Zero Radio Sans", ui-monospace, monospace; color: #799a8c; min-height: 90px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>ZERO RADIO / AUDIO AUDIT</h1>
+  <div class="sub">独立声学台：先验证 L/R 声道与四方位，不经过调查界面。</div>
+  <main>
+    <section class="panel">
+      <h2>PROBE CONTROL</h2>
+      <button id="init">启动音频</button>
+      <button id="check-all">运行全部检查</button>
+      <div class="meter">
+        <div><span>声道测试</span></div>
+        <button id="test-left">L 测试音</button>
+        <button id="test-right">R 测试音</button>
+        <div id="channel-readout">L −90 dB / R −90 dB</div>
+      </div>
+      <label>监听位
+        <select id="station">
+          <option value="0">R-01 · 短混响</option>
+          <option value="1" selected>R-02 · 中混响</option>
+          <option value="2">R-03 · 长混响</option>
+        </select>
+      </label>
+      <div class="quadrants">
+        <button data-quadrant="LF">左前 LF</button>
+        <button data-quadrant="RF">右前 RF</button>
+        <button data-quadrant="LB">左后 LB</button>
+        <button data-quadrant="RB">右后 RB</button>
+      </div>
+      <div id="log"></div>
+    </section>
+    <section class="panel">
+      <h2>CHECK REGISTER</h2>
+      <table>
+        <thead><tr><th>检查</th><th>结果</th><th>实测 / 参数</th></tr></thead>
+        <tbody id="checks"><tr><td colspan="3" class="wait">等待启动音频</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+  <script type="module" src="./src/audit.js"></script>
+</body>
+</html>

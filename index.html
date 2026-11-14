@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07100d">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%2307100d' stroke='%23e1b875'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e1b875'/%3E%3C/svg%3E">
+  <title>零点电台 · ZERO RADIO</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="site-shell">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i></span>
+        <div>
+          <span class="brand-en">ZERO RADIO / BINAURAL FIELD UNIT</span>
+          <span class="brand-cn">零点电台</span>
+        </div>
+      </div>
+      <div class="header-meta">
+        <span id="headerStatus">本地声学调查终端</span>
+        <span class="live-dot"></span>
+        <time id="clock">00:00:00</time>
+      </div>
+    </header>
+
+    <main id="bootScreen" class="screen boot-screen">
+      <section class="briefing-card">
+        <div class="case-kicker">CASE FILE / 0000-0714</div>
+        <div class="boot-title-row">
+          <div>
+            <h1>零点电台</h1>
+            <p class="boot-subtitle">双耳异常广播调查 · THREE ADJACENT ROOMS</p>
+          </div>
+          <span class="case-index" aria-hidden="true">03</span>
+        </div>
+        <p class="lead">午夜后，三间相邻接收室同时记录到未知载波。没有视觉记录，只有声音。戴上耳机，切换监听位，找出两处广播。</p>
+        <div class="briefing-facts">
+          <div><span>01</span><b>三间接收室</b><small>三组独立卷积混响</small></div>
+          <div><span>02</span><b>两处异常广播</b><small>α / β 各自不定方位</small></div>
+          <div><span>03</span><b>一条时间线</b><small>判断哪一处先出现</small></div>
+        </div>
+        <div class="protocol">
+          <p><strong>判读规则</strong> 方位以中继监听室 R-02 为基准。左/右声道强弱判断横向，前/后滤波与距离衰减判断纵深。</p>
+          <p><strong>监听建议</strong> 先切换三处监听位比较距离和房间混响，再回到中继室确认方位。当前页不会显示平面图。</p>
+        </div>
+      </section>
+
+      <aside class="calibration-card">
+        <div class="panel-heading">
+          <span>PRE-FLIGHT / HEADPHONE CALIBRATION</span>
+          <span id="calibrationState">STEP 01</span>
+        </div>
+        <div class="calibration-art" id="calibrationArt">
+          <span class="ear-label">L</span>
+          <div class="calibration-wave"><i></i><i></i><i></i><i></i><i></i><b></b></div>
+          <span class="ear-label">R</span>
+        </div>
+        <p class="small-copy">测试音会先落在左耳，再落在右耳。请确认两侧都能独立听见，并保持双侧音量一致。</p>
+        <button id="playCalibration" class="wide-button">播放 L → R 校准音</button>
+        <label class="confirm-row">
+          <input type="checkbox" id="confirmLeft">
+          <span class="check-box"></span>
+          <span>左声道可闻且无偏音</span>
+        </label>
+        <label class="confirm-row">
+          <input type="checkbox" id="confirmRight">
+          <span class="check-box"></span>
+          <span>右声道可闻且无偏音</span>
+        </label>
+        <label class="range-row">
+          <span>监听音量</span>
+          <input id="volume" type="range" min="0" max="100" value="76">
+          <output id="volumeOut">76%</output>
+        </label>
+        <div class="seed-row">
+          <label for="seedInput">CASE SEED</label>
+          <input id="seedInput" type="text" maxlength="40" spellcheck="false" value="ZERO-0714">
+          <button id="randomSeed" title="生成新 seed" aria-label="生成新 seed">↻</button>
+        </div>
+        <div class="boot-actions">
+          <button id="startCase" class="primary-button" disabled>锁定 seed · 开始调查</button>
+          <span id="audioError" role="alert"></span>
+        </div>
+        <p class="headphone-note">建议使用有线耳机。扬声器会破坏左右声像与前后滤波线索。</p>
+      </aside>
+    </main>
+
+    <main id="investigationScreen" class="screen investigation-screen" hidden>
+      <div class="case-strip">
+        <span>ACTIVE CASE <b id="activeSeed">—</b></span>
+        <span>HASH <b id="activeHash">—</b></span>
+        <span>TASK <b>定位 α / β · 判定先后</b></span>
+        <span id="captureStatus" class="capture-status">STANDBY</span>
+      </div>
+
+      <div class="console-grid">
+        <aside class="instrument-panel posts-panel">
+          <div class="panel-heading">
+            <span>LISTENING POSTS</span><span>3 ROOMS</span>
+          </div>
+          <div id="postList" class="post-list"></div>
+          <div class="buffer-block">
+            <div class="mini-label">EVIDENCE BUFFER <b id="evidenceCount">0 / 3</b></div>
+            <div class="buffer-bars" id="bufferBars"><i></i><i></i><i></i></div>
+            <div class="mini-label">CAPTURE <b id="captureTime">00.0 / 15.0 s</b></div>
+            <div class="capture-progress"><i id="captureProgress"></i></div>
+          </div>
+          <button id="captureButton" class="wide-button primary-outline">开始采集</button>
+          <button id="pauseButton" class="wide-button compact">暂停调查</button>
+          <div class="receiving-note">
+            <span>RECEIVING NOTE</span>
+            <p id="receiveNote">选择监听位，采集相同记录时间线上的声音。</p>
+          </div>
+          <div class="seed-foot">
+            <span>SEED <b id="sideSeed">—</b></span>
+            <button id="restartSameSeed">同 seed 重开</button>
+          </div>
+        </aside>
+
+        <section class="scope-column">
+          <div class="instrument-panel spectrum-panel">
+            <div class="panel-heading">
+              <span>FFT / BINAURAL SPECTRUM</span>
+              <span id="peakReadout">PEAK — Hz</span>
+            </div>
+            <canvas id="spectrumCanvas" aria-label="实时双耳频谱"></canvas>
+            <div class="axis-row"><span>30 Hz</span><span>300 Hz</span><span>3 kHz</span><span>10 kHz</span></div>
+          </div>
+          <div class="lower-instruments">
+            <div class="instrument-panel meter-panel">
+              <div class="panel-heading"><span>SPL / L-R</span><span id="balanceReadout">BAL 0.00</span></div>
+              <canvas id="meterCanvas" aria-label="左右声压表"></canvas>
+            </div>
+            <div class="instrument-panel track-panel">
+              <div class="panel-heading"><span>REC / TWO-CHANNEL</span><span id="trackTime">00:00.0</span></div>
+              <canvas id="trackCanvas" aria-label="双声道录音轨道"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <aside class="instrument-panel verdict-panel">
+          <div class="panel-heading"><span>VERDICT CONSOLE</span><span>LOCAL</span></div>
+          <p class="verdict-copy">以 R-02 为方位基准。综合三处监听差异后提交结论。</p>
+          <div class="answer-group">
+            <span class="answer-label"><i class="alpha-dot"></i> α 广播方位</span>
+            <div class="answer-grid" data-answer-group="alpha">
+              <button data-value="LF">左前</button><button data-value="RF">右前</button>
+              <button data-value="LB">左后</button><button data-value="RB">右后</button>
+            </div>
+          </div>
+          <div class="answer-group">
+            <span class="answer-label"><i class="beta-dot"></i> β 广播方位</span>
+            <div class="answer-grid" data-answer-group="beta">
+              <button data-value="LF">左前</button><button data-value="RF">右前</button>
+              <button data-value="LB">左后</button><button data-value="RB">右后</button>
+            </div>
+          </div>
+          <div class="answer-group">
+            <span class="answer-label">出现顺序</span>
+            <div class="answer-grid sequence-grid" data-answer-group="first">
+              <button data-value="alpha">α 先出现</button><button data-value="beta">β 先出现</button>
+            </div>
+          </div>
+          <div class="verdict-help">
+            α 为低频脉冲组，β 为高频双音节组。切换监听位不会改变记录本身的起始顺序。
+          </div>
+          <button id="submitVerdict" class="primary-button">提交结论</button>
+          <span class="verdict-note" id="verdictNote">尚缺 3 个监听位的有效证据</span>
+        </aside>
+      </div>
+    </main>
+
+    <main id="resultScreen" class="screen result-screen" hidden>
+      <div class="result-layout">
+        <section class="result-report">
+          <span class="result-code" id="resultCode">CASE CLOSED</span>
+          <h2 id="resultTitle">正确结案</h2>
+          <p id="resultReason"></p>
+          <div class="result-answers" id="resultAnswers"></div>
+          <div class="result-meta">
+            <span>SEED <b id="resultSeed"></b></span>
+            <span>FINGERPRINT <b id="resultFingerprint"></b></span>
+            <span>EVIDENCE <b id="resultEvidence"></b></span>
+          </div>
+          <div class="result-actions">
+            <button id="resultSameSeed" class="primary-button">同 seed 重开</button>
+            <button id="newCase" class="wide-button">输入新 seed</button>
+          </div>
+        </section>
+        <section class="instrument-panel result-map-panel">
+          <div class="panel-heading"><span>TOP-DOWN SURVEY / R-02 ORIGIN</span><span>前方 ↑</span></div>
+          <canvas id="resultMap" aria-label="俯视声源测量图"></canvas>
+          <p class="map-caption">声源坐标、声像方向与混响参数来自刚完成案件的同一份音频模型。</p>
+        </section>
+      </div>
+    </main>
+
+    <footer class="app-footer">
+      <span>NO AUDIO FILES · PURE WEB AUDIO SYNTHESIS</span>
+      <span>STEREO IR × 3 · BINAURAL QUADRANT SOLVER</span>
+      <a href="./audit.html">声学审计台 ↗</a>
+    </footer>
+  </div>
+
+  <div id="pauseOverlay" class="modal-overlay" hidden>
+    <div class="pause-card">
+      <span class="result-code">INVESTIGATION PAUSED</span>
+      <h2>调查已暂停</h2>
+      <p>记录时间线已冻结。恢复后将从同一时间点继续。</p>
+      <div class="pause-actions">
+        <button id="resumeButton" class="primary-button">继续监听</button>
+        <button id="pauseRestart" class="wide-button">同 seed 重开</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
