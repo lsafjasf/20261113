@@ -1,0 +1,11 @@
+{
+  "name": "dual-helm-caisson",
+  "version": "1.0.0",
+  "description": "双舵沉箱：双人同屏合作海底洞穴驾驶游戏",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node test/edge-cases.js && node test/smoke-render.js && node test/validate.js",
+    "validate": "node test/validate.js"
+  }
+}
