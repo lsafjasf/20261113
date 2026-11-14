@@ -1,0 +1,26 @@
+{
+  "name": "against-tide-mailman",
+  "version": "1.0.0",
+  "description": "逆潮邮差 - Canvas 网页小游戏",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/headless.js",
+    "test:browser": "node test/browser.js",
+    "test:autopilot": "node test/autopilot.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lsafjasf/20261113.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lsafjasf/20261113/issues"
+  },
+  "homepage": "https://github.com/lsafjasf/20261113#readme",
+  "dependencies": {
+    "playwright": "^1.65.1"
+  }
+}

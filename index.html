@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>逆潮邮差</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #06121f; color: #dfeaf2;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  #wrap { position: relative; width: 864px; margin: 12px auto; }
+  canvas { display: block; background: #0b2a44; border-radius: 8px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.5); }
+  #hud { display: flex; gap: 18px; align-items: center; padding: 8px 12px;
+    font-size: 15px; background: rgba(10,25,40,.85); border-radius: 8px;
+    margin-bottom: 8px; letter-spacing: .5px; }
+  #hud b { color: #ffd76a; font-weight: 600; }
+  #hud .warn { color: #ff7a6a; }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; text-align: center;
+    background: rgba(4,14,24,.82); border-radius: 8px; z-index: 5; }
+  .screen h1 { margin: 0; font-size: 44px; color: #ffd76a; letter-spacing: 6px;
+    text-shadow: 0 2px 12px rgba(255,180,60,.35); }
+  .screen h2 { margin: 0; font-size: 30px; color: #ffd76a; }
+  .screen p { margin: 0; line-height: 1.9; color: #b8cbdb; font-size: 15px; }
+  .screen button { font-size: 17px; padding: 10px 34px; border: 0; border-radius: 6px;
+    background: #ffb84d; color: #2a1a05; cursor: pointer; font-weight: 600; }
+  .screen button:hover { background: #ffcf7d; }
+  .screen input { font-size: 16px; padding: 8px 12px; width: 160px; text-align: center;
+    border-radius: 6px; border: 1px solid #3a5a78; background: #0d2338; color: #dfeaf2; }
+  .hidden { display: none !important; }
+  kbd { background: #16314c; border-radius: 4px; padding: 1px 7px; font-size: 13px;
+    border: 1px solid #2c4f70; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <span>时间 <b id="hud-time">--</b></span>
+    <span>耐久 <b id="hud-hull">--</b></span>
+    <span>帆 <b id="hud-sail">--</b></span>
+    <span>信件 <b id="hud-mail">--</b></span>
+    <span>风 <b id="hud-wind">--</b></span>
+    <span id="hud-msg" style="margin-left:auto;color:#8fe3ff"></span>
+  </div>
+  <canvas id="game" width="864" height="720"></canvas>
+
+  <div id="screen-start" class="screen">
+    <h1>逆潮邮差</h1>
+    <p>驾驶小邮船穿越海湾，把三封信送到三座浮标，再返回码头。<br>
+      <kbd>↑</kbd> 前进　<kbd>←</kbd><kbd>→</kbd> 转向　<kbd>↓</kbd> 减速<br>
+      <kbd>空格</kbd> 升帆 / 降帆（帆越高越快，碰撞受损越重）<br>
+      <kbd>E</kbd> 靠近浮标投递　<kbd>P</kbd> 暂停</p>
+    <p>地图种子 <input id="seed-input" value="20261113"></p>
+    <button id="btn-start">出 航</button>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <h2>已暂停</h2>
+    <p>按 <kbd>P</kbd> 继续航行</p>
+    <button id="btn-resume">继 续</button>
+  </div>
+
+  <div id="screen-end" class="screen hidden">
+    <h2 id="end-title">--</h2>
+    <p id="end-detail">--</p>
+    <button id="btn-retry">再来一局（同一种子）</button>
+    <button id="btn-new">新的海湾（随机种子）</button>
+  </div>
+</div>
+<script>
+'use strict';
+/* ================= 基础:种子随机数 ================= */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashSeed(str) {
+  str = String(str);
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/* ================= 地图生成 ================= */
+const GW = 48, GH = 40;
+const T_DEEP = 0, T_SHALLOW = 1, T_ISLAND = 2, T_REEF = 3;
+
+function generateMap(seed) {
+  const rng = mulberry32(hashSeed(seed));
+  const grid = new Uint8Array(GW * GH); // 全部深水
+  const at = (x, y) => grid[y * GW + x];
+  const set = (x, y, v) => { grid[y * GW + x] = v; };
+  const inMap = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH;
+
+  // 1. 码头与三座浮标
+  const dock = { x: 2, y: 8 + Math.floor(rng() * (GH - 16)) };
+  const buoys = [];
+  const bx = [0.42, 0.66, 0.88];
+  for (let i = 0; i < 3; i++) {
+    let bxv, byv, tries = 0;
+    do {
+      bxv = Math.floor(GW * bx[i] + (rng() - 0.5) * 8);
+      byv = 4 + Math.floor(rng() * (GH - 8));
+      tries++;
+    } while (tries < 60 && buoys.some(b => Math.abs(b.x - bxv) + Math.abs(b.y - byv) < 14));
+    buoys.push({ x: Math.max(3, Math.min(GW - 4, bxv)), y: byv });
+  }
+
+  // 2. 先雕刻一条串联码头与浮标的可通行水路(受保护)
+  const protectedCells = new Set();
+  const protect = (x, y) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (inMap(x + dx, y + dy)) protectedCells.add((y + dy) * GW + (x + dx));
+    }
+  };
+  const waypoints = [dock].concat(buoys);
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    let cx = waypoints[i].x, cy = waypoints[i].y;
+    const tx = waypoints[i + 1].x, ty = waypoints[i + 1].y;
+    let guard = 0;
+    while ((cx !== tx || cy !== ty) && guard++ < 500) {
+      protect(cx, cy);
+      // 带随机摆动地走向目标,让水路蜿蜒
+      if (rng() < 0.28) {
+        const dir = Math.floor(rng() * 4);
+        const nx = cx + [1, -1, 0, 0][dir], ny = cy + [0, 0, 1, -1][dir];
+        if (inMap(nx, ny) && Math.abs(nx - tx) + Math.abs(ny - ty) <= Math.abs(cx - tx) + Math.abs(cy - ty) + 2) {
+          cx = nx; cy = ny;
+        }
+      }
+      if (cx !== tx && (cy === ty || rng() < 0.55)) cx += Math.sign(tx - cx);
+      else if (cy !== ty) cy += Math.sign(ty - cy);
+    }
+    protect(tx, ty);
+  }
+  const isProtected = (x, y) => protectedCells.has(y * GW + x);
+
+  // 3. 随机布置岛屿(团块)、浅滩、礁石,全部避开受保护水路
+  const islandCount = 10 + Math.floor(rng() * 5);
+  for (let i = 0; i < islandCount; i++) {
+    let cx = 2 + Math.floor(rng() * (GW - 4));
+    let cy = 2 + Math.floor(rng() * (GH - 4));
+    const size = 10 + Math.floor(rng() * 20);
+    for (let s = 0; s < size; s++) {
+      if (inMap(cx, cy) && !isProtected(cx, cy)) set(cx, cy, T_ISLAND);
+      cx += Math.floor(rng() * 3) - 1;
+      cy += Math.floor(rng() * 3) - 1;
+      cx = Math.max(1, Math.min(GW - 2, cx));
+      cy = Math.max(1, Math.min(GH - 2, cy));
+    }
+  }
+  // 浅滩:岛屿周围 + 零星水域
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (at(x, y) !== T_DEEP) continue;
+    let nearIsland = false;
+    for (let dy = -1; dy <= 1 && !nearIsland; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        if (inMap(x + dx, y + dy) && at(x + dx, y + dy) === T_ISLAND) { nearIsland = true; break; }
+    if (nearIsland && rng() < 0.55) set(x, y, T_SHALLOW);
+    else if (!isProtected(x, y) && rng() < 0.02) set(x, y, T_SHALLOW);
+  }
+  // 礁石:孤立危险点,避开水路
+  const reefCount = 14 + Math.floor(rng() * 8);
+  for (let i = 0; i < reefCount; i++) {
+    const x = 1 + Math.floor(rng() * (GW - 2));
+    const y = 1 + Math.floor(rng() * (GH - 2));
+    if (at(x, y) === T_DEEP && !isProtected(x, y)) set(x, y, T_REEF);
+  }
+
+  // 4. 连通性兜底:任一浮标不可达就直挖一条走廊
+  const passable = v => v === T_DEEP || v === T_SHALLOW;
+  const reachable = (sx, sy) => {
+    const seen = new Uint8Array(GW * GH);
+    const q = [[sx, sy]]; seen[sy * GW + sx] = 1;
+    while (q.length) {
+      const [x, y] = q.pop();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (inMap(nx, ny) && !seen[ny * GW + nx] && passable(at(nx, ny))) {
+          seen[ny * GW + nx] = 1; q.push([nx, ny]);
+        }
+      }
+    }
+    return seen;
+  };
+  let seen = reachable(dock.x, dock.y);
+  for (const b of buoys) {
+    if (!seen[b.y * GW + b.x]) {
+      let cx = b.x, cy = b.y;
+      while (cx !== dock.x) { set(cx, cy, T_DEEP); cx += Math.sign(dock.x - cx); }
+      while (cy !== dock.y) { set(cx, cy, T_DEEP); cy += Math.sign(dock.y - cy); }
+      seen = reachable(dock.x, dock.y);
+    }
+  }
+
+  // 5. 固定洋流区(矩形,方向强度固定)
+  const currents = [];
+  const zoneCount = 3 + Math.floor(rng() * 2);
+  for (let i = 0; i < zoneCount; i++) {
+    const w = 6 + Math.floor(rng() * 8), h = 4 + Math.floor(rng() * 6);
+    const x = 2 + Math.floor(rng() * (GW - w - 4));
+    const y = 2 + Math.floor(rng() * (GH - h - 4));
+    const ang = rng() * Math.PI * 2;
+    const sp = 0.55 + rng() * 0.5;
+    currents.push({ x, y, w, h, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp });
+  }
+
+  return { seed, grid, dock, buoys, currents };
+}
+
+/* ================= 游戏状态 ================= */
+const TILE = 18;
+const GAME_TIME = 210;          // 秒
+const HULL_MAX = 100;
+const SAIL_MAX = 3;
+const SHIP_R = 0.34;            // 船体半径(格)
+
+const state = {
+  mode: 'menu',   // menu | playing | paused | won | lost
+  map: null, seed: '',
+  ship: null, wind: null, windBase: 0, windSeed: 0,
+  time: 0, timeLeft: GAME_TIME, hull: HULL_MAX,
+  mail: 3, delivered: null, hitCooldown: 0, shake: 0,
+  endReason: '',
+};
+
+function newGame(seed) {
+  const map = generateMap(seed);
+  state.map = map; state.seed = seed;
+  state.ship = {
+    x: map.dock.x + 0.5, y: map.dock.y + 0.5,
+    vx: 0, vy: 0, heading: 0, av: 0, sail: 0,
+  };
+  const rng = mulberry32(hashSeed(seed) ^ 0x9e3779b9);
+  state.windBase = rng() * Math.PI * 2;
+  state.windSeed = rng() * 100;
+  state.wind = { angle: state.windBase, speed: 3 };
+  state.time = 0; state.timeLeft = GAME_TIME; state.hull = HULL_MAX;
+  state.mail = 3; state.delivered = map.buoys.map(() => false);
+  state.hitCooldown = 0; state.shake = 0; state.endReason = '';
+  state.mode = 'playing';
+  buildStaticLayer();
+  resetFx();
+}
+
+/* ================= 风与洋流 ================= */
+function updateWind(dt) {
+  const t = state.time;
+  state.wind.angle = state.windBase
+    + 0.7 * Math.sin(t * 0.045 + state.windSeed)
+    + 0.35 * Math.sin(t * 0.013 + state.windSeed * 2.7);
+  state.wind.speed = 3.2 + 1.6 * Math.sin(t * 0.03 + state.windSeed * 1.3)
+    + 0.8 * Math.sin(t * 0.11);
+  if (state.wind.speed < 1.2) state.wind.speed = 1.2;
+}
+
+function currentAt(x, y) {
+  let cx = 0, cy = 0;
+  for (const z of state.map.currents) {
+    if (x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h) { cx += z.vx; cy += z.vy; }
+  }
+  return { x: cx, y: cy };
+}
+
+/* ================= 船体物理 ================= */
+const keys = Object.create(null);
+
+function tileAtPx(x, y) {
+  const gx = Math.floor(x), gy = Math.floor(y);
+  if (gx < 0 || gy < 0 || gx >= GW || gy >= GH) return T_ISLAND;
+  return state.map.grid[gy * GW + gx];
+}
+
+function windSailFactor(heading) {
+  const diff = Math.atan2(Math.sin(state.wind.angle - heading), Math.cos(state.wind.angle - heading));
+  const align = Math.cos(diff);
+  return align > 0 ? 0.3 + 0.8 * align : 0.3 + 0.15 * align;
+}
+
+function damageShip(amount, kind) {
+  if (state.hitCooldown > 0) return;
+  state.hitCooldown = 0.7;
+  state.shake = Math.min(1, amount / 18);
+  state.hull -= amount;
+  Sfx.hit(kind);
+  if (state.hull <= 0) {
+    state.hull = 0;
+    endGame(false, '船体耐久归零,邮船沉没了…');
+  }
+}
+
+function updateShip(dt) {
+  const s = state.ship;
+  // 转向:带角速度惯性
+  const turnIn = (keys.ArrowLeft ? -1 : 0) + (keys.ArrowRight ? 1 : 0);
+  s.av += turnIn * 7.5 * dt;
+  s.av *= Math.pow(0.12, dt);
+  if (s.av > 2.8) s.av = 2.8; if (s.av < -2.8) s.av = -2.8;
+  s.heading += s.av * dt;
+
+  // 前进推力:帆级 × 风向夹角
+  if (keys.ArrowUp && s.sail > 0) {
+    const thrust = s.sail * 2.4 * windSailFactor(s.heading);
+    s.vx += Math.cos(s.heading) * thrust * dt;
+    s.vy += Math.sin(s.heading) * thrust * dt;
+  }
+  // 倒车/刹车
+  if (keys.ArrowDown) { s.vx *= Math.pow(0.18, dt); s.vy *= Math.pow(0.18, dt); }
+
+  // 水阻(浅滩更大)
+  const onShallow = tileAtPx(s.x, s.y) === T_SHALLOW;
+  const drag = onShallow ? 0.28 : 0.62;
+  s.vx *= Math.pow(drag, dt); s.vy *= Math.pow(drag, dt);
+
+  // 洋流持续推动
+  const cur = currentAt(s.x, s.y);
+  s.vx += cur.x * dt * 0.9; s.vy += cur.y * dt * 0.9;
+
+  // 限速
+  const sp = Math.hypot(s.vx, s.vy);
+  const maxSp = 6.5;
+  if (sp > maxSp) { s.vx *= maxSp / sp; s.vy *= maxSp / sp; }
+
+  s.x += s.vx * dt; s.y += s.vy * dt;
+
+  // 碰撞:岛屿 / 礁石 / 边界
+  collideShip(s);
+  if (state.hitCooldown > 0) state.hitCooldown -= dt;
+  if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 2.2);
+}
+
+function collideShip(s) {
+  const gx = Math.floor(s.x), gy = Math.floor(s.y);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const tx = gx + dx, ty = gy + dy;
+    const solid = tx < 0 || ty < 0 || tx >= GW || ty >= GH ||
+      state.map.grid[ty * GW + tx] === T_ISLAND ||
+      state.map.grid[ty * GW + tx] === T_REEF;
+    if (!solid) continue;
+    const isReef = tx >= 0 && ty >= 0 && tx < GW && ty < GH &&
+      state.map.grid[ty * GW + tx] === T_REEF;
+    // 船心到瓦片矩形最近点
+    const nx = Math.max(tx, Math.min(s.x, tx + 1));
+    const ny = Math.max(ty, Math.min(s.y, ty + 1));
+    let ddx = s.x - nx, ddy = s.y - ny;
+    let dist = Math.hypot(ddx, ddy);
+    if (dist >= SHIP_R) continue;
+    if (dist < 1e-6) { ddx = 0; ddy = -1; dist = 1; }
+    const ux = ddx / dist, uy = ddy / dist;
+    // 推出
+    s.x += ux * (SHIP_R - dist); s.y += uy * (SHIP_R - dist);
+    // 反弹:法向速度反向并衰减
+    const vn = s.vx * ux + s.vy * uy;
+    if (vn < 0) {
+      const rest = 0.55;
+      s.vx -= (1 + rest) * vn * ux;
+      s.vy -= (1 + rest) * vn * uy;
+      const impact = -vn;
+      if (impact > 0.9) {
+        const sailMul = 1 + 0.25 * s.sail;
+        damageShip(impact * 2.8 * sailMul * (isReef ? 1.5 : 1), isReef ? 'reef' : 'land');
+      }
+    }
+  }
+}
+
+/* ================= 投递与胜负 ================= */
+function nearestBuoy() {
+  const s = state.ship;
+  let best = -1, bestD = 1.8;
+  state.map.buoys.forEach((b, i) => {
+    if (state.delivered[i]) return;
+    const d = Math.hypot(s.x - (b.x + 0.5), s.y - (b.y + 0.5));
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  return best;
+}
+
+function tryDeliver() {
+  if (state.mode !== 'playing' || state.mail <= 0) return;
+  const i = nearestBuoy();
+  if (i < 0) return;
+  state.delivered[i] = true;
+  state.mail--;
+  Sfx.deliver();
+  flashMsg(state.mail > 0 ? `已投递!还剩 ${state.mail} 封信` : '信件全部送达,返回码头!');
+}
+
+function checkDockReturn() {
+  if (state.mail > 0) return;
+  const s = state.ship, d = state.map.dock;
+  if (Math.hypot(s.x - (d.x + 0.5), s.y - (d.y + 0.5)) < 2.0) {
+    endGame(true, `三封信全部送达,用时 ${Math.round(state.time)} 秒,剩余耐久 ${Math.round(state.hull)}`);
+  }
+}
+
+function endGame(won, reason) {
+  if (state.mode !== 'playing') return;
+  state.mode = won ? 'won' : 'lost';
+  state.endReason = reason;
+  if (won) Sfx.win(); else Sfx.lose();
+  showScreen('end');
+}
+
+/* ================= 主循环 ================= */
+function tick(dt) {
+  if (state.mode !== 'playing') return;
+  state.time += dt;
+  state.timeLeft -= dt;
+  if (state.timeLeft <= 0) {
+    state.timeLeft = 0;
+    endGame(false, '时间耗尽,信件没能全部送达…');
+    return;
+  }
+  updateWind(dt);
+  updateShip(dt);
+  checkDockReturn();
+  updateHud();
+}
+
+let lastTs = 0;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  if (!lastTs) lastTs = ts;
+  let dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+  if (dt > 0.05) dt = 0.05;
+  tick(dt);
+  updateWindAudio();
+  render();
+}
+
+/* ================= 输入 ================= */
+document.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  const k = e.key;
+  if (k === ' ') { e.preventDefault(); toggleSail(); return; }
+  if (k === 'e' || k === 'E') { tryDeliver(); return; }
+  if (k === 'p' || k === 'P' || k === 'Escape') { togglePause(); return; }
+  if (k === 'Enter' && state.mode === 'menu') { startFromUI(); return; }
+  keys[k] = true;
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+function toggleSail() {
+  if (state.mode !== 'playing') return;
+  const s = state.ship;
+  s.sail = (s.sail + 1) % (SAIL_MAX + 1);
+  Sfx.sail(s.sail);
+  flashMsg(s.sail === 0 ? '帆已落下' : `帆升到 ${s.sail} 级`);
+}
+
+function togglePause() {
+  if (state.mode === 'playing') { state.mode = 'paused'; showScreen('pause'); }
+  else if (state.mode === 'paused') { state.mode = 'playing'; showScreen(null); }
+}
+
+/* ================= HUD 与界面 ================= */
+const $ = id => document.getElementById(id);
+let msgTimer = 0;
+function flashMsg(text) {
+  $('hud-msg').textContent = text;
+  msgTimer = 2.5;
+}
+function updateHud() {
+  $('hud-time').textContent = Math.ceil(state.timeLeft) + 's';
+  $('hud-time').className = state.timeLeft < 30 ? 'warn' : '';
+  $('hud-hull').textContent = Math.round(state.hull);
+  $('hud-hull').className = state.hull < 30 ? 'warn' : '';
+  $('hud-sail').textContent = '▮'.repeat(state.ship.sail) + '▯'.repeat(SAIL_MAX - state.ship.sail);
+  $('hud-mail').textContent = state.mail + ' / 3';
+  const dirs = ['东', '东北', '北', '西北', '西', '西南', '南', '东南'];
+  const a = state.wind.angle;
+  const idx = ((Math.round(-a / (Math.PI / 4)) % 8) + 8) % 8;
+  $('hud-wind').textContent = dirs[idx] + '风 ' + state.wind.speed.toFixed(1);
+  if (msgTimer > 0) { msgTimer -= 1 / 60; if (msgTimer <= 0) $('hud-msg').textContent = ''; }
+}
+
+function showScreen(which) {
+  $('screen-start').classList.toggle('hidden', which !== 'start');
+  $('screen-pause').classList.toggle('hidden', which !== 'pause');
+  $('screen-end').classList.toggle('hidden', which !== 'end');
+  if (which === 'end') {
+    $('end-title').textContent = state.mode === 'won' ? '✉ 送达成功!' : '✘ 航行失败';
+    $('end-detail').textContent = state.endReason;
+  }
+}
+
+function startFromUI() {
+  const seed = $('seed-input').value.trim() || '20261113';
+  initAudio();
+  newGame(seed);
+  showScreen(null);
+  flashMsg('顺风!先把信送到三座浮标');
+}
+
+/* ================= 渲染 ================= */
+const canvas = $('game');
+const ctx = canvas.getContext('2d');
+let staticLayer = null;
+
+function buildStaticLayer() {
+  staticLayer = document.createElement('canvas');
+  staticLayer.width = GW * TILE; staticLayer.height = GH * TILE;
+  const g = staticLayer.getContext('2d');
+  const rng = mulberry32(hashSeed(state.seed) ^ 0x51ab);
+  // 海面底色
+  const grad = g.createLinearGradient(0, 0, 0, GH * TILE);
+  grad.addColorStop(0, '#10415f'); grad.addColorStop(1, '#0a2c46');
+  g.fillStyle = grad; g.fillRect(0, 0, GW * TILE, GH * TILE);
+  // 每格水面微妙色差
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const v = state.map.grid[y * GW + x];
+    if (v === T_DEEP) {
+      g.fillStyle = `rgba(255,255,255,${(rng() * 0.05).toFixed(3)})`;
+      g.fillRect(x * TILE, y * TILE, TILE, TILE);
+    } else if (v === T_SHALLOW) {
+      g.fillStyle = '#2b6f8c'; g.fillRect(x * TILE, y * TILE, TILE, TILE);
+      g.fillStyle = 'rgba(224,204,150,0.25)';
+      for (let i = 0; i < 3; i++)
+        g.fillRect(x * TILE + rng() * TILE, y * TILE + rng() * TILE, 2, 2);
+    }
+  }
+  // 岛屿:沙岸 + 草地
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (state.map.grid[y * GW + x] !== T_ISLAND) continue;
+    const px = x * TILE, py = y * TILE;
+    g.fillStyle = '#d9c27a'; g.fillRect(px - 1, py - 1, TILE + 2, TILE + 2);
+    g.fillStyle = '#3f8f4f'; g.fillRect(px + 2, py + 2, TILE - 4, TILE - 4);
+    g.fillStyle = 'rgba(20,60,25,0.5)';
+    g.fillRect(px + 4 + rng() * 6, py + 4 + rng() * 6, 3, 3);
+  }
+  // 礁石
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (state.map.grid[y * GW + x] !== T_REEF) continue;
+    const px = x * TILE, py = y * TILE;
+    g.fillStyle = '#46586a';
+    g.beginPath();
+    g.moveTo(px + 3, py + TILE - 3); g.lineTo(px + TILE / 2, py + 3 + rng() * 4);
+    g.lineTo(px + TILE - 3, py + TILE - 3); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.fillRect(px + TILE / 2 - 1, py + 5, 2, 2);
+  }
+  // 码头:木栈桥
+  const d = state.map.dock;
+  g.fillStyle = '#8a6238';
+  g.fillRect(d.x * TILE - TILE, d.y * TILE + 2, TILE * 2, TILE - 4);
+  g.fillStyle = '#6b4a28';
+  for (let i = 0; i < 4; i++) g.fillRect(d.x * TILE - TILE + 3 + i * 8, d.y * TILE + 4, 3, TILE - 8);
+  g.fillStyle = '#c9a05e';
+  g.fillRect(d.x * TILE - TILE + 2, d.y * TILE + 2, 4, TILE - 4);
+}
+
+function render() {
+  if (!state.map || !staticLayer) return;
+  ctx.save();
+  if (state.shake > 0) {
+    ctx.translate((Math.random() - 0.5) * state.shake * 10,
+                  (Math.random() - 0.5) * state.shake * 10);
+  }
+  ctx.drawImage(staticLayer, 0, 0);
+  drawCurrents(ctx);
+  drawWake(ctx);
+  drawBuoys(ctx);
+  drawShip(ctx);
+  drawWind(ctx);
+  ctx.restore();
+}
+
+/* ---- 动态效果状态 ---- */
+const fx = { windP: [], curP: [], wake: [], wakeTimer: 0 };
+function resetFx() {
+  fx.windP = []; fx.curP = []; fx.wake = []; fx.wakeTimer = 0;
+  const rng = mulberry32(hashSeed(state.seed) ^ 0x77aa);
+  for (let i = 0; i < 80; i++)
+    fx.windP.push({ x: rng() * GW * TILE, y: rng() * GH * TILE, life: rng() * 4 });
+  for (const z of state.map.currents)
+    for (let i = 0; i < 12; i++)
+      fx.curP.push({ z, x: (z.x + rng() * z.w) * TILE, y: (z.y + rng() * z.h) * TILE });
+}
+
+/* ---- 风向流线 ---- */
+function drawWind(g) {
+  const wx = Math.cos(state.wind.angle) * state.wind.speed * 9;
+  const wy = Math.sin(state.wind.angle) * state.wind.speed * 9;
+  g.strokeStyle = 'rgba(200,230,255,0.28)';
+  g.lineWidth = 1.2;
+  const dt = 1 / 60;
+  for (const p of fx.windP) {
+    const curl = Math.sin(p.y * 0.02 + state.time) * 6;
+    const ox = p.x, oy = p.y;
+    p.x += (wx + curl) * dt; p.y += (wy + curl * 0.4) * dt;
+    p.life -= dt;
+    if (p.x < 0 || p.x > GW * TILE || p.y < 0 || p.y > GH * TILE || p.life <= 0) {
+      p.x = Math.random() * GW * TILE; p.y = Math.random() * GH * TILE; p.life = 2 + Math.random() * 3;
+      continue;
+    }
+    g.beginPath(); g.moveTo(ox, oy); g.lineTo(p.x, p.y); g.stroke();
+  }
+}
+
+/* ---- 洋流颗粒 ---- */
+function drawCurrents(g) {
+  const dt = 1 / 60;
+  for (const z of state.map.currents) {
+    g.fillStyle = 'rgba(80,200,220,0.07)';
+    g.fillRect(z.x * TILE, z.y * TILE, z.w * TILE, z.h * TILE);
+  }
+  g.strokeStyle = 'rgba(120,230,255,0.5)';
+  g.lineWidth = 1.4;
+  for (const p of fx.curP) {
+    const ox = p.x, oy = p.y;
+    p.x += p.z.vx * 14 * dt; p.y += p.z.vy * 14 * dt;
+    if (p.x < p.z.x * TILE || p.x > (p.z.x + p.z.w) * TILE ||
+        p.y < p.z.y * TILE || p.y > (p.z.y + p.z.h) * TILE) {
+      p.x = (p.z.x + Math.random() * p.z.w) * TILE;
+      p.y = (p.z.y + Math.random() * p.z.h) * TILE;
+      continue;
+    }
+    g.beginPath(); g.moveTo(ox, oy); g.lineTo(p.x, p.y); g.stroke();
+  }
+}
+
+/* ---- 船尾水迹 ---- */
+function drawWake(g) {
+  const s = state.ship;
+  const sp = Math.hypot(s.vx, s.vy);
+  fx.wakeTimer -= 1 / 60;
+  if (sp > 0.8 && fx.wakeTimer <= 0 && state.mode === 'playing') {
+    fx.wake.push({ x: s.x * TILE, y: s.y * TILE, age: 0 });
+    fx.wakeTimer = 0.06;
+    if (fx.wake.length > 120) fx.wake.shift();
+  }
+  for (let i = fx.wake.length - 1; i >= 0; i--) {
+    const w = fx.wake[i];
+    w.age += 1 / 60;
+    if (w.age > 1.4) { fx.wake.splice(i, 1); continue; }
+    const r = 3 + w.age * 9;
+    g.strokeStyle = `rgba(220,240,255,${(0.4 * (1 - w.age / 1.4)).toFixed(3)})`;
+    g.lineWidth = 1.5;
+    g.beginPath(); g.arc(w.x, w.y, r, 0, Math.PI * 2); g.stroke();
+  }
+}
+
+/* ---- 浮标 ---- */
+function drawBuoys(g) {
+  const t = state.time;
+  state.map.buoys.forEach((b, i) => {
+    const bx = (b.x + 0.5) * TILE;
+    const by = (b.y + 0.5) * TILE + Math.sin(t * 2 + i * 2.1) * 2;
+    const done = state.delivered[i];
+    // 靠近提示圈
+    if (!done && state.mode === 'playing') {
+      const d = Math.hypot(state.ship.x - (b.x + 0.5), state.ship.y - (b.y + 0.5));
+      if (d < 2.6) {
+        g.strokeStyle = `rgba(255,220,120,${0.5 + 0.3 * Math.sin(t * 6)})`;
+        g.lineWidth = 2;
+        g.beginPath(); g.arc(bx, by, 16 + Math.sin(t * 6) * 3, 0, Math.PI * 2); g.stroke();
+        if (d < 1.8) {
+          g.fillStyle = '#ffe9a8'; g.font = '12px sans-serif';
+          g.textAlign = 'center'; g.fillText('按 E 投递', bx, by - 20);
+        }
+      }
+    }
+    // 浮标本体
+    g.fillStyle = done ? '#37b26c' : '#e05252';
+    g.beginPath();
+    g.moveTo(bx - 6, by + 6); g.lineTo(bx, by - 8); g.lineTo(bx + 6, by + 6);
+    g.closePath(); g.fill();
+    g.fillStyle = '#f4f0e6'; g.fillRect(bx - 1.5, by - 12, 3, 5);
+    g.fillStyle = done ? '#b6ffce' : '#ffd2d2';
+    g.beginPath(); g.arc(bx, by - 13, 2.4, 0, Math.PI * 2); g.fill();
+    if (done) {
+      g.strokeStyle = '#eaffea'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(bx - 4, by); g.lineTo(bx - 1, by + 3);
+      g.lineTo(bx + 5, by - 4); g.stroke();
+    }
+  });
+  // 全部送完后码头提示圈
+  if (state.mail === 0 && state.mode === 'playing') {
+    const d = state.map.dock;
+    const dx = (d.x + 0.5) * TILE, dy = (d.y + 0.5) * TILE;
+    g.strokeStyle = `rgba(140,255,170,${0.5 + 0.3 * Math.sin(t * 5)})`;
+    g.lineWidth = 2.5;
+    g.beginPath(); g.arc(dx, dy, 20 + Math.sin(t * 5) * 4, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = '#c9ffd9'; g.font = '12px sans-serif'; g.textAlign = 'center';
+    g.fillText('返回码头!', dx, dy - 26);
+  }
+}
+
+/* ---- 邮船 ---- */
+function drawShip(g) {
+  const s = state.ship;
+  g.save();
+  g.translate(s.x * TILE, s.y * TILE);
+  g.rotate(s.heading);
+  // 船体
+  g.fillStyle = '#7a4f2c';
+  g.beginPath();
+  g.moveTo(9, 0); g.lineTo(4, -4.5); g.lineTo(-7, -4);
+  g.lineTo(-9, 0); g.lineTo(-7, 4); g.lineTo(4, 4.5);
+  g.closePath(); g.fill();
+  g.strokeStyle = '#4c2f16'; g.lineWidth = 1; g.stroke();
+  // 帆(高度随帆级)
+  if (s.sail > 0) {
+    const h = 4 + s.sail * 3.4;
+    g.fillStyle = 'rgba(245,242,230,0.95)';
+    g.beginPath();
+    g.moveTo(1, 0); g.lineTo(-2, -h); g.lineTo(-2, 0); g.closePath(); g.fill();
+    g.strokeStyle = '#b8b2a0'; g.stroke();
+  }
+  g.restore();
+  // 受击闪红
+  if (state.hitCooldown > 0.4) {
+    g.strokeStyle = 'rgba(255,90,70,0.8)'; g.lineWidth = 2;
+    g.beginPath(); g.arc(s.x * TILE, s.y * TILE, 11, 0, Math.PI * 2); g.stroke();
+  }
+}
+
+/* ================= 音效(Web Audio 合成) ================= */
+let AC = null, masterGain = null, windGain = null, windFilter = null;
+
+function initAudio() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) { return; }
+  masterGain = AC.createGain();
+  masterGain.gain.value = 0.5;
+  masterGain.connect(AC.destination);
+  // 风声:循环噪声 → 带通 → 增益随风速
+  const len = AC.sampleRate * 2;
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  const src = AC.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  windFilter = AC.createBiquadFilter();
+  windFilter.type = 'bandpass'; windFilter.frequency.value = 500; windFilter.Q.value = 0.8;
+  windGain = AC.createGain(); windGain.gain.value = 0;
+  src.connect(windFilter); windFilter.connect(windGain); windGain.connect(masterGain);
+  src.start();
+}
+
+function updateWindAudio() {
+  if (!AC || !windGain) return;
+  const sp = state.mode === 'playing' ? state.wind.speed : 0;
+  windGain.gain.setTargetAtTime(0.015 + sp * 0.016, AC.currentTime, 0.4);
+  windFilter.frequency.setTargetAtTime(300 + sp * 90, AC.currentTime, 0.4);
+}
+
+function tone(freq, dur, type, vol, when, slideTo) {
+  if (!AC) return;
+  const t0 = AC.currentTime + (when || 0);
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(masterGain);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+
+function noiseBurst(dur, vol, freq) {
+  if (!AC) return;
+  const len = Math.floor(AC.sampleRate * dur);
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq || 900;
+  const g = AC.createGain(); g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(masterGain);
+  src.start();
+}
+
+const Sfx = {
+  hit(kind) {
+    tone(kind === 'reef' ? 140 : 90, 0.28, 'triangle', 0.5, 0, 45);
+    noiseBurst(0.18, 0.35, kind === 'reef' ? 1600 : 700);
+  },
+  deliver() {
+    tone(660, 0.14, 'sine', 0.35);
+    tone(880, 0.22, 'sine', 0.35, 0.12);
+  },
+  sail(level) {
+    noiseBurst(0.12, 0.12 + level * 0.05, 1200 + level * 500);
+  },
+  win() {
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'sine', 0.32, i * 0.14));
+  },
+  lose() {
+    tone(300, 0.5, 'sawtooth', 0.22, 0, 120);
+    tone(150, 0.8, 'triangle', 0.25, 0.3, 70);
+  },
+};
+
+/* ================= 启动 ================= */
+$('btn-start').addEventListener('click', startFromUI);
+$('btn-resume').addEventListener('click', togglePause);
+$('btn-retry').addEventListener('click', () => { initAudio(); newGame(state.seed); showScreen(null); });
+$('btn-new').addEventListener('click', () => {
+  $('seed-input').value = String(Math.floor(Math.random() * 1e9));
+  initAudio(); newGame($('seed-input').value); showScreen(null);
+});
+showScreen('start');
+requestAnimationFrame(frame);
+
+/* 调试句柄(无头测试用) */
+window.__game = {
+  state, keys, newGame, tick, tryDeliver, toggleSail, togglePause,
+  generateMap, currentAt, windSailFactor, nearestBuoy,
+  press(k) { keys[k] = true; }, release(k) { keys[k] = false; },
+};
+</script>
+</body>
+</html>
