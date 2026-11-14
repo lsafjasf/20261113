@@ -1,0 +1,10 @@
+WenQuanYi Micro Hei (文泉驿微米黑)
+https://sourceforge.net/projects/wqy/
+
+Copyright 2008-2009, The WenQuanYi Project Board of Trustees
+Copyright 2008-2009, Qianqian Fang and contributors
+Based in part on the Google Droid font family.
+Licensed under the Apache License, Version 2.0 (see APACHE-2.0.txt).
+
+The bundled src/assets/greenhouse-sans.woff2 is a glyph subset generated
+from the upstream font for this application's interface text.

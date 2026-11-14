@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="温室当班：在 90 秒内管理六块种植床的水、温度和通风，带三批作物躲过冷空气、云层和设备过热。"
+    />
+    <title>温室当班 · Glasshouse Shift</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="ambient-glow ambient-glow-one"></div>
+    <div class="ambient-glow ambient-glow-two"></div>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="温室当班首页">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 44 44" fill="none">
+              <path d="M6 35V19L22 7l16 12v16H6Z" stroke="currentColor" stroke-width="2" />
+              <path d="M6 25h32M22 7v28M13 35V26h7v9M25 35V26h7v9" stroke="currentColor" stroke-width="1.5" />
+              <path d="M29 15c-4.3.2-6.6-1.7-7.2-5.4 4.3-.1 6.7 1.6 7.2 5.4Z" fill="currentColor" />
+            </svg>
+          </span>
+          <span>
+            <strong>温室当班</strong>
+            <small>GLASSHOUSE SHIFT</small>
+          </span>
+        </a>
+
+        <div class="shift-clock" aria-live="polite">
+          <span class="clock-label">剩余轮班</span>
+          <strong id="shift-clock">01:30</strong>
+          <span class="clock-rule"></span>
+          <span id="shift-state">待开始</span>
+        </div>
+
+        <div class="top-actions">
+          <button id="sound-toggle" class="icon-button" type="button" aria-label="关闭音效" aria-pressed="true">
+            <svg class="sound-on" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+              <path d="M16 9.2a4 4 0 0 1 0 5.6M18.5 6.7a7.5 7.5 0 0 1 0 10.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            </svg>
+            <svg class="sound-off" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+              <path d="m17 9 4 6m0-6-4 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+            </svg>
+          </button>
+          <button id="pause-button" class="text-button" type="button" disabled>
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path d="M6.5 4.5h2v11h-2zM11.5 4.5h2v11h-2z" fill="currentColor" />
+            </svg>
+            <span>暂停</span>
+            <kbd>P</kbd>
+          </button>
+        </div>
+      </header>
+
+      <section class="telemetry" aria-label="温室实时状态">
+        <article class="telemetry-card water-card">
+          <div class="telemetry-heading">
+            <span class="telemetry-icon water-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 3.5S6.8 9.4 6.8 14a5.2 5.2 0 1 0 10.4 0C17.2 9.4 12 3.5 12 3.5Z" stroke="currentColor" stroke-width="1.7" />
+                <path d="M9.3 14.2c.2 1.7 1.1 2.6 2.7 2.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </span>
+            <span>
+              <small>灌溉水箱</small>
+              <strong><span id="water-value">100</span><em>L</em></strong>
+            </span>
+          </div>
+          <div class="meter water-meter" role="meter" aria-label="剩余水量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+            <span id="water-fill"></span>
+          </div>
+          <p id="water-hint">每床灌溉耗水 1.8 L/s</p>
+        </article>
+
+        <article class="telemetry-card weather-card" id="weather-card">
+          <div class="weather-main">
+            <div class="weather-orb" id="weather-orb" aria-hidden="true">
+              <svg class="weather-sun" viewBox="0 0 52 52" fill="none">
+                <circle cx="26" cy="26" r="9" stroke="currentColor" stroke-width="2" />
+                <path d="M26 5v7M26 40v7M5 26h7M40 26h7M11.2 11.2l5 5M35.8 35.8l5 5M40.8 11.2l-5 5M16.2 35.8l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+              <svg class="weather-cloud" viewBox="0 0 52 52" fill="none">
+                <path d="M14 37h26a7 7 0 0 0 .7-14 12.3 12.3 0 0 0-23.6-2.4A8 8 0 0 0 14 37Z" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <svg class="weather-snow" viewBox="0 0 52 52" fill="none">
+                <path d="M26 7v38M9.5 16.5l33 19M9.5 35.5l33-19M21 11l5 4 5-4M21 41l5-4 5 4M10 21l6 1-1-6M42 31l-6-1 1 6M42 21l-6 1 1-6M10 31l6-1-1 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+              <svg class="weather-heat" viewBox="0 0 52 52" fill="none">
+                <path d="M17 41c-4-6 3-8 0-15-2-5 1-8 4-11 0 5 4 6 5 11 5-3 5-7 4-10 6 5 9 11 6 18-2 5-5 6-6 7H17Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                <path d="M23 41c-2-3 2-5 1-8m7 8c1-3-2-4-1-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+            </div>
+            <div class="weather-copy">
+              <small id="weather-kicker">当前天气</small>
+              <strong id="weather-title">晴 · 日照稳定</strong>
+              <p id="weather-advice">维持三批作物的舒适区间</p>
+            </div>
+          </div>
+          <div class="forecast-pill" id="forecast-pill">
+            <span class="forecast-dot"></span>
+            <span id="forecast-text">下一场天气：04s 后</span>
+          </div>
+        </article>
+
+        <article class="telemetry-card batch-card">
+          <div class="telemetry-heading batch-heading">
+            <span>
+              <small>本班交货</small>
+              <strong><span id="batch-total">0</span><em>/ 3 批</em></strong>
+            </span>
+            <span class="batch-crates" aria-hidden="true">
+              <i data-crate="A"></i><i data-crate="B"></i><i data-crate="C"></i>
+            </span>
+          </div>
+          <div class="batch-list" id="batch-list">
+            <div><b>A</b><span>生菜</span><i><em>0</em>/2</i></div>
+            <div><b>B</b><span>番茄</span><i><em>0</em>/2</i></div>
+            <div><b>C</b><span>罗勒</span><i><em>0</em>/2</i></div>
+          </div>
+        </article>
+      </section>
+
+      <main class="game-stage">
+        <div class="canvas-frame" id="canvas-frame">
+          <canvas
+            id="greenhouse-canvas"
+            width="1200"
+            height="660"
+            aria-label="温室剖面图，包含六块可点击的种植床"
+          ></canvas>
+
+          <div class="scene-topline">
+            <span><i class="live-dot"></i> 温室 03 · 夜间班</span>
+            <span>点击床体选择 · 数字键 1—6 快捷选择</span>
+          </div>
+
+          <div class="event-ribbon" id="event-ribbon" aria-live="polite">
+            <span class="event-ribbon-icon" aria-hidden="true">!</span>
+            <span id="event-ribbon-text">天气预警</span>
+          </div>
+
+          <div class="overlay intro-overlay" id="intro-overlay">
+            <div class="intro-grid">
+              <div class="intro-copy">
+                <div class="eyebrow"><span>SHIFT 01</span><span>90 秒</span><span>三批作物</span></div>
+                <h1>让温室<br /><em>熬过这场天气。</em></h1>
+                <p>
+                  六块床，三条生长区间。调水、控温和通风，让每一批都在合适的气候里持续生长。
+                  天气不会等你准备好。
+                </p>
+                <div class="intro-rules">
+                  <span><i class="rule-mark water"></i>水箱只有 100 L</span>
+                  <span><i class="rule-mark heat"></i>过热 4.5 秒即失败</span>
+                  <span><i class="rule-mark time"></i>90 秒内完成收获</span>
+                </div>
+                <button class="primary-button" id="start-button" type="button">
+                  <span>开始值班</span>
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M5 12h13m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+                <p class="intro-footnote">建议开启声音 · 键盘 Q / W / E / R 操作四类设备</p>
+              </div>
+              <div class="intro-graphic" aria-hidden="true">
+                <div class="graphic-ring ring-one"></div>
+                <div class="graphic-ring ring-two"></div>
+                <div class="specimen">
+                  <span class="specimen-label">BATCH · B</span>
+                  <svg viewBox="0 0 280 280" fill="none">
+                    <path d="M140 232V94" stroke="#80b979" stroke-width="3" stroke-linecap="round" />
+                    <path d="M140 172c-28-4-48-20-55-47 28-4 50 10 55 47Z" fill="#4f9e64" />
+                    <path d="M140 146c25-5 43-20 49-44-26-3-45 10-49 44Z" fill="#6fc478" />
+                    <path d="M140 116c-23-4-39-18-44-40 23-3 40 9 44 40Z" fill="#8dd47f" />
+                    <circle cx="115" cy="185" r="17" fill="#ff7862" />
+                    <circle cx="161" cy="169" r="14" fill="#ff9277" />
+                    <circle cx="155" cy="207" r="18" fill="#e85e4e" />
+                    <path d="M110 171c5-2 9-1 12 2M156 155c4-2 8-1 10 2M149 190c5-2 9-1 12 2" stroke="#ffc0a8" stroke-width="3" stroke-linecap="round" />
+                  </svg>
+                  <span class="specimen-value">T 24°<i></i>M 68%<i></i>L 72%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="overlay pause-overlay is-hidden" id="pause-overlay">
+            <div class="pause-card">
+              <span class="eyebrow">SHIFT PAUSED</span>
+              <h2>轮班暂停</h2>
+              <p>温室时钟和所有设备都已冻结。喘口气，再回来照看它们。</p>
+              <div class="overlay-actions">
+                <button class="primary-button compact" id="resume-button" type="button">继续值班</button>
+                <button class="secondary-button" id="pause-restart-button" type="button">重新开始</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="overlay result-overlay is-hidden" id="result-overlay">
+            <article class="result-card">
+              <div class="result-topline">
+                <span id="result-kicker">SHIFT REPORT · 01</span>
+                <span id="result-time">用时 00:00</span>
+              </div>
+              <div class="result-heading">
+                <div>
+                  <h2 id="result-title">三批作物全部入库</h2>
+                  <p id="result-reason">冷空气、云层和过热设备都撑过去了。</p>
+                </div>
+                <div class="result-stamp" id="result-stamp">合格</div>
+              </div>
+              <div class="result-bed-grid" id="result-beds"></div>
+              <div class="result-footer">
+                <p><span>剩余水量</span><strong id="result-water">0 L</strong><span>批次完成</span><strong id="result-batches">0 / 3</strong></p>
+                <div class="overlay-actions">
+                  <button class="primary-button compact" id="retry-button" type="button">重试本局</button>
+                  <button class="secondary-button" id="restart-overlay-button" type="button">重新开始</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </main>
+
+      <section class="control-deck" aria-label="种植床操作台">
+        <article class="bed-readout">
+          <div class="bed-identity">
+            <span class="bed-id" id="selected-id">A1</span>
+            <span>
+              <small id="selected-batch">批次 A · 奶油生菜</small>
+              <strong id="selected-status">生长中</strong>
+            </span>
+            <span class="growth-number" id="growth-number">0<em>%</em></span>
+          </div>
+          <div class="readout-meters">
+            <div class="readout-meter" data-meter="moisture">
+              <span><i>水滴</i><b id="moisture-value">63%</b></span>
+              <div><em id="moisture-fill"></em><i class="ideal-band" id="moisture-band"></i></div>
+            </div>
+            <div class="readout-meter" data-meter="temperature">
+              <span><i>温度</i><b id="temperature-value">18°C</b></span>
+              <div><em id="temperature-fill"></em><i class="ideal-band" id="temperature-band"></i></div>
+            </div>
+            <div class="readout-meter" data-meter="light">
+              <span><i>光照</i><b id="light-value">42%</b></span>
+              <div><em id="light-fill"></em><i class="ideal-band" id="light-band"></i></div>
+            </div>
+          </div>
+        </article>
+
+        <div class="action-group" role="group" aria-label="选中床的设备开关">
+          <button class="action-button irrigation" type="button" data-control="irrigation" aria-pressed="false">
+            <span class="action-glyph" aria-hidden="true">
+              <svg viewBox="0 0 28 28" fill="none">
+                <path d="M14 4S7.5 11.4 7.5 17a6.5 6.5 0 1 0 13 0C20.5 11.4 14 4 14 4Z" stroke="currentColor" stroke-width="1.8" />
+                <path d="M10.7 17.2c.3 2 1.4 3.1 3.3 3.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </span>
+            <span class="action-label"><strong>灌溉</strong><small>1.8 L/s</small></span>
+            <kbd>Q</kbd>
+          </button>
+          <button class="action-button heating" type="button" data-control="heating" aria-pressed="false">
+            <span class="action-glyph" aria-hidden="true">
+              <svg viewBox="0 0 28 28" fill="none">
+                <path d="M10 22c-2-3 1.5-4 0-7.5-1-2.3.3-4.1 2.1-5.8 0 2.5 2 3 2.5 5.5 2.5-1.5 2.5-3.5 2-5 3 2.5 4.5 5.5 3 9-1 2.5-2.5 3-3 3.8H10Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span class="action-label"><strong>加热</strong><small>升温 + 耗水</small></span>
+            <kbd>W</kbd>
+          </button>
+          <button class="action-button ventilation" type="button" data-control="ventilation" aria-pressed="false">
+            <span class="action-glyph" aria-hidden="true">
+              <svg viewBox="0 0 28 28" fill="none">
+                <circle cx="14" cy="14" r="3" stroke="currentColor" stroke-width="1.8" />
+                <path d="M14 11c0-5 4-7 7-5 3 2 1 6-3 5.5M17 14c5 0 7 4 5 7-2 3-6 1-5.5-3M14 17c0 5-4 7-7 5-3-2-1-6 3-5.5M11 14c-5 0-7-4-5-7 2-3 6-1 5.5 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+              </svg>
+            </span>
+            <span class="action-label"><strong>通风</strong><small>降温 + 排湿</small></span>
+            <kbd>E</kbd>
+          </button>
+          <button class="action-button shade" type="button" data-control="shade" aria-pressed="false">
+            <span class="action-glyph" aria-hidden="true">
+              <svg viewBox="0 0 28 28" fill="none">
+                <path d="M5 10h18L14 21 5 10Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                <path d="M9 10v10.5M14 10v11M19 10v10.5M14 4v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </span>
+            <span class="action-label"><strong>遮光</strong><small>降低光照</small></span>
+            <kbd>R</kbd>
+          </button>
+        </div>
+
+        <button class="harvest-button" id="harvest-button" type="button" disabled>
+          <span>
+            <small id="harvest-kicker">尚未成熟</small>
+            <strong>收获</strong>
+          </span>
+          <kbd>SPACE</kbd>
+        </button>
+      </section>
+
+      <footer class="game-footer">
+        <p><span class="footer-led"></span> 绿色区间不断生长，离开区间只会暂停。不要让水箱先见底。</p>
+        <p class="key-hints"><kbd>1—6</kbd> 选床 <kbd>Q W E R</kbd> 设备 <kbd>SPACE</kbd> 收获 <kbd>P</kbd> 暂停</p>
+      </footer>
+    </div>
+
+    <div class="sr-only" id="live-announcer" aria-live="assertive"></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
