@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="潮间带：一个让 Canvas 画面与 Web Audio 共用同一条时间线的互动声景编辑器。"
+    />
+    <title>潮间带 · 互动声景编辑器</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="brand-copy">
+            <p class="eyebrow">INTERTIDAL / AUDIOVISUAL STUDY</p>
+            <h1>潮间带</h1>
+          </div>
+        </div>
+
+        <div class="project-state" aria-live="polite">
+          <span class="state-dot"></span>
+          <span id="projectStatus">示例工程 · 12 秒循环</span>
+        </div>
+
+        <nav class="toolbar" aria-label="工程工具">
+          <button
+            class="transport-button"
+            id="playButton"
+            type="button"
+            aria-label="播放"
+            aria-pressed="false"
+          >
+            <svg class="icon play-icon" viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M6.25 4.25 15 10l-8.75 5.75z" />
+            </svg>
+            <svg class="icon pause-icon" viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M6.5 4.5v11M13.5 4.5v11" />
+            </svg>
+            <span class="transport-label">播放</span>
+          </button>
+          <button
+            class="tool-button is-active"
+            id="loopButton"
+            type="button"
+            aria-pressed="true"
+            title="循环播放"
+          >
+            <svg class="icon" viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M4.1 7.4A6 6 0 0 1 15 5.3l.8.9M15.9 12.6A6 6 0 0 1 5 14.7l-.8-.9" />
+              <path d="M15.8 3.2v3h-3M4.2 16.8v-3h3" />
+            </svg>
+            <span>循环</span>
+          </button>
+          <span class="toolbar-divider" aria-hidden="true"></span>
+          <button class="tool-button" id="saveButton" type="button" title="保存工程 JSON">
+            <svg class="icon" viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M4.25 3.75h9.2l2.8 2.8v9.7H4.25z" />
+              <path d="M7 3.75v4h6v-4M7 16.25v-4h6v4" />
+            </svg>
+            <span>保存</span>
+          </button>
+          <button class="tool-button" id="loadButton" type="button" title="载入工程 JSON">
+            <svg class="icon" viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M3.75 6.25h12.5v9.5H3.75z" />
+              <path d="M7 6.25V4.25h6v2M10 8.75v5M7.8 11.5 10 13.7l2.2-2.2" />
+            </svg>
+            <span>载入</span>
+          </button>
+          <input id="fileInput" type="file" accept=".json,application/json" hidden />
+          <button class="tool-button" id="exportButton" type="button" title="导出当前帧 PNG">
+            <svg class="icon" viewBox="0 0 20 20" aria-hidden="true">
+              <rect x="3.25" y="4.25" width="13.5" height="11.5" rx="1" />
+              <circle cx="7.2" cy="8" r="1.2" />
+              <path d="m4.5 14 4-4 2.7 2.6 2.2-2.2 2.2 2.2" />
+            </svg>
+            <span>PNG</span>
+          </button>
+        </nav>
+      </header>
+
+      <main class="workspace">
+        <section class="workbench" aria-label="画面与时间线">
+          <section class="scene-panel">
+            <div class="scene-topline">
+              <div class="scene-heading">
+                <span class="live-dot"></span>
+                <span>实时合成画面</span>
+                <span class="scene-rule"></span>
+                <span id="sceneHint">点击播放，启用合成声音</span>
+              </div>
+              <div class="scene-clock" aria-label="当前时间">
+                <span id="currentTimecode">00:00.000</span>
+                <span class="clock-total">/ 00:12.000</span>
+              </div>
+            </div>
+
+            <div class="canvas-frame" id="canvasFrame">
+              <canvas
+                id="sceneCanvas"
+                width="1280"
+                height="720"
+                aria-label="潮间带实时生成画面：潮水、雾与月光、远处灯塔"
+              ></canvas>
+              <div class="canvas-caption" aria-hidden="true">
+                <span>潮线 · 雾 · 光束</span>
+                <span>PROCEDURAL CANVAS 2D</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="timeline-panel" aria-label="参数时间线">
+            <header class="timeline-head">
+              <div>
+                <p class="eyebrow">TIME / PARAMETER</p>
+                <h2>参数时间线</h2>
+              </div>
+              <div class="timeline-summary">
+                <span><i class="legend-dot tide"></i>潮水</span>
+                <span><i class="legend-dot fog"></i>雾与月光</span>
+                <span><i class="legend-dot light"></i>灯塔</span>
+                <span class="keyframe-total" id="keyframeTotal">0 个关键帧</span>
+              </div>
+            </header>
+
+            <div class="timeline-content" id="timelineContent">
+              <div class="timeline-labels">
+                <div class="ruler-spacer">轨道</div>
+                <div class="track-label is-selected" data-track="tide" tabindex="0" role="button">
+                  <span class="track-number">01</span>
+                  <span class="track-copy">
+                    <span class="track-name">潮水高度</span>
+                    <span class="track-value" id="labelValueTide">0.44</span>
+                  </span>
+                  <button
+                    class="keyframe-add"
+                    type="button"
+                    data-add-track="tide"
+                    aria-label="在播放头添加潮水高度关键帧"
+                    title="在播放头添加关键帧"
+                  >
+                    <span></span>
+                  </button>
+                </div>
+                <div class="track-label" data-track="fog" tabindex="0" role="button">
+                  <span class="track-number">02</span>
+                  <span class="track-copy">
+                    <span class="track-name">雾与月光</span>
+                    <span class="track-value" id="labelValueFog">0.50</span>
+                  </span>
+                  <button
+                    class="keyframe-add"
+                    type="button"
+                    data-add-track="fog"
+                    aria-label="在播放头添加雾与月光关键帧"
+                    title="在播放头添加关键帧"
+                  >
+                    <span></span>
+                  </button>
+                </div>
+                <div class="track-label" data-track="light" tabindex="0" role="button">
+                  <span class="track-number">03</span>
+                  <span class="track-copy">
+                    <span class="track-name">灯塔明灭</span>
+                    <span class="track-value" id="labelValueLight">0.18</span>
+                  </span>
+                  <button
+                    class="keyframe-add"
+                    type="button"
+                    data-add-track="light"
+                    aria-label="在播放头添加灯塔明灭关键帧"
+                    title="在播放头添加关键帧"
+                  >
+                    <span></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="timeline-stage" id="timelineStage">
+                <div class="ruler" id="timeRuler" aria-label="时间刻度">
+                  <div class="ruler-ticks" id="rulerTicks"></div>
+                </div>
+                <div class="track-lane" data-lane="tide">
+                  <svg class="track-curve" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="tideArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="#79d4c5" stop-opacity=".22" />
+                        <stop offset="1" stop-color="#79d4c5" stop-opacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path class="curve-area tide-area" d="" />
+                    <path class="curve-line tide-line" d="" />
+                  </svg>
+                  <div class="keyframe-layer" id="markersTide"></div>
+                </div>
+                <div class="track-lane" data-lane="fog">
+                  <svg class="track-curve" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="fogArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="#d9d8d1" stop-opacity=".19" />
+                        <stop offset="1" stop-color="#d9d8d1" stop-opacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path class="curve-area fog-area" d="" />
+                    <path class="curve-line fog-line" d="" />
+                  </svg>
+                  <div class="keyframe-layer" id="markersFog"></div>
+                </div>
+                <div class="track-lane" data-lane="light">
+                  <svg class="track-curve" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="lightArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="#f0b77b" stop-opacity=".24" />
+                        <stop offset="1" stop-color="#f0b77b" stop-opacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path class="curve-area light-area" d="" />
+                    <path class="curve-line light-line" d="" />
+                  </svg>
+                  <div class="keyframe-layer" id="markersLight"></div>
+                </div>
+                <div class="playhead" id="playhead" aria-hidden="true">
+                  <span class="playhead-cap"></span>
+                </div>
+              </div>
+            </div>
+
+            <footer class="timeline-footer">
+              <span>点击或拖动时间线预览</span>
+              <span><kbd>K</kbd> 添加关键帧 · <kbd>Delete</kbd> 删除所选</span>
+            </footer>
+          </section>
+        </section>
+
+        <aside class="inspector" aria-label="参数检查器">
+          <header class="inspector-head">
+            <p class="eyebrow">INSPECTOR</p>
+            <div class="inspector-title-row">
+              <h2>声景参数</h2>
+              <span class="schema-label">LOOP 01</span>
+            </div>
+          </header>
+
+          <section class="position-block">
+            <div class="section-kicker">播放头</div>
+            <div class="big-timecode" id="bigTimecode">00:00.000</div>
+            <div class="transport-progress">
+              <span id="transportProgress"></span>
+            </div>
+            <div class="position-meta">
+              <span>0.00 s</span>
+              <span>12.00 s</span>
+            </div>
+          </section>
+
+          <section class="parameter-section">
+            <div class="section-head">
+              <span class="section-kicker">当前插值</span>
+              <span class="section-note">0 — 1</span>
+            </div>
+            <button class="parameter-card tide" type="button" data-track="tide">
+              <span class="parameter-swatch"></span>
+              <span class="parameter-copy">
+                <span class="parameter-name">潮水高度</span>
+                <span class="parameter-desc">低频水体 · 潮线位置</span>
+              </span>
+              <span class="parameter-readout" id="valueTide">0.440</span>
+            </button>
+            <button class="parameter-card fog" type="button" data-track="fog">
+              <span class="parameter-swatch"></span>
+              <span class="parameter-copy">
+                <span class="parameter-name">雾与月光</span>
+                <span class="parameter-desc">空气噪声 · 月光扩散</span>
+              </span>
+              <span class="parameter-readout" id="valueFog">0.500</span>
+            </button>
+            <button class="parameter-card light" type="button" data-track="light">
+              <span class="parameter-swatch"></span>
+              <span class="parameter-copy">
+                <span class="parameter-name">灯塔明灭</span>
+                <span class="parameter-desc">光束强度 · 脉冲音量</span>
+              </span>
+              <span class="parameter-readout" id="valueLight">0.180</span>
+            </button>
+            <button class="add-at-playhead" id="addAtPlayheadButton" type="button">
+              <span class="plus-icon"></span>
+              在当前播放头添加所选轨道关键帧
+            </button>
+          </section>
+
+          <section class="keyframe-section">
+            <div class="section-head">
+              <span class="section-kicker">所选关键帧</span>
+              <span class="selection-badge" id="selectionBadge">未选择</span>
+            </div>
+            <div class="empty-selection" id="emptySelection">
+              <span class="empty-diamond"></span>
+              <p>点击时间线上的菱形标记<br />以查看和删除关键帧</p>
+            </div>
+            <div class="keyframe-editor" id="keyframeEditor" hidden>
+              <div class="keyframe-editor-head">
+                <strong id="keyframeLayerLabel">潮水高度</strong>
+                <span id="keyframeTimeLabel">00:00.000</span>
+              </div>
+              <label class="value-control">
+                <span>值</span>
+                <input
+                  id="keyframeValueInput"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.001"
+                  value="0.5"
+                />
+                <output id="keyframeValueOutput" for="keyframeValueInput">0.500</output>
+              </label>
+              <button class="delete-button" id="deleteKeyframeButton" type="button">
+                删除关键帧
+              </button>
+            </div>
+          </section>
+
+          <section class="sound-section">
+            <div class="section-head">
+              <span class="section-kicker">合成声场</span>
+              <span class="audio-state" id="audioState"><i></i>待启动</span>
+            </div>
+            <div class="sound-monitor" id="soundMonitor" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <dl class="sound-list">
+              <div><dt>低频水流</dt><dd>FILTERED NOISE + SUB</dd></div>
+              <div><dt>持续雾声</dt><dd>BAND-LIMITED AIR</dd></div>
+              <div><dt>灯塔脉冲</dt><dd>KEYFRAME-TRIGGERED</dd></div>
+            </dl>
+          </section>
+
+          <footer class="inspector-footer">
+            <span>CANVAS 2D + WEB AUDIO</span>
+            <span>12.000 SEC / A/V LOCKED</span>
+          </footer>
+        </aside>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="src/app.js"></script>
+  </body>
+</html>
