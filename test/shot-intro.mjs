@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+import { spawn } from 'node:child_process';
+import { setTimeout as sleep } from 'node:timers/promises';
+const server = spawn('python3', ['-m','http.server','8795'], { cwd: process.cwd(), stdio:'ignore' });
+await sleep(800);
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport:{width:1440,height:1000} });
+await page.goto('http://127.0.0.1:8795/index.html');
+await page.waitForSelector('#startBtn');
+await page.screenshot({ path:'screenshots/e2e-0-intro.png' });
+await browser.close(); server.kill();
+console.log('intro shot done');

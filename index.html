@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>双镜台 · 双人同屏合作</title>
+    <link rel="stylesheet" href="src/style.css" />
+  </head>
+  <body>
+    <!-- 简报 / 开场屏 -->
+    <section id="briefing" class="briefing">
+      <div class="brief-card">
+        <div class="brief-left">
+          <p class="eyebrow cyan">双人同屏 · 正式合作模式</p>
+          <h1 class="title">双 镜 台</h1>
+          <p class="lead">
+            风暴正在逼近。两个人共控一台射电望远镜，辨别闪烁回波，在两轴对准后坚持两秒，锁定三个真正的异常信号。
+          </p>
+          <div class="brief-stats">
+            <div><b>3</b><span>真异常</span></div>
+            <div><b>2 s</b><span>双轴保持</span></div>
+            <div><b>2</b><span>错锁即停</span></div>
+          </div>
+          <div class="key-row">
+            <div class="key-card amber-top">
+              <p class="kc-title">左玩家</p>
+              <div class="kc-line"><kbd>A</kbd><kbd>D</kbd><em>方位</em></div>
+              <div class="kc-line"><kbd>W</kbd><kbd>S</kbd><em>增益</em></div>
+            </div>
+            <div class="key-card cyan-top">
+              <p class="kc-title">右玩家</p>
+              <div class="kc-line"><kbd>↑</kbd><kbd>↓</kbd><em>仰角</em></div>
+              <div class="kc-line"><kbd>,</kbd><kbd>.</kbd><em>频段</em></div>
+            </div>
+          </div>
+        </div>
+        <div class="brief-right">
+          <div class="brief-head">
+            <span>任务简报</span><small>BRIEF 07</small>
+          </div>
+          <ol class="brief-list">
+            <li><i>01</i>高增益能收到弱信号，但会放大噪声，也更快耗电。</li>
+            <li><i>02</i>真异常是双峰，诱饵回波是单峰；错锁两次任务终止。</li>
+            <li><i>03</i>风暴持续推偏两轴，阵风前会亮起推力预报。</li>
+          </ol>
+          <div class="brief-note"><b>提示音</b>左右声道分别提示方位与仰角，频段会改变音色。</div>
+          <label class="debug-toggle">
+            <input type="checkbox" id="debugSwitch" />
+            <span><b>单人调试</b><small>显示数值辅助，不计正式记录</small></span>
+          </label>
+          <button id="startBtn" class="primary-btn">开始联合观测 <em>ENTER</em></button>
+          <p class="hint">建议两名玩家共用键盘，同时按住各自按键。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 主仪表盘 -->
+    <main id="dashboard" class="dashboard hidden" aria-label="双镜台仪表仪表盘">
+      <header class="topbar">
+        <div class="brand"><h2>双 镜 台</h2><small>DUAL MIRROR</small></div>
+        <div class="top-box"><small>模式</small><b id="modeLabel">双人同屏 · 正式合作</b></div>
+        <div class="top-box"><small>风暴前锋</small><b id="timeLabel">01:50</b></div>
+        <div class="top-box battery-box">
+          <small>电池</small>
+          <div class="battery"><i id="batteryBar"></i></div>
+          <b id="batteryLabel">100%</b>
+        </div>
+        <div class="top-actions">
+          <button id="muteBtn" class="ghost-btn">◀ 声音开</button>
+          <button id="restartBtn" class="ghost-btn">重新布阵</button>
+        </div>
+      </header>
+
+      <div class="console">
+        <!-- 左：方位台 -->
+        <section class="panel panel-left">
+          <div class="panel-head"><small>L / 01</small><span class="tag amber">□ 左玩家</span></div>
+          <h3>方位台</h3>
+          <p class="sub">共同状态 · 方位轴</p>
+          <div class="readout-row">
+            <small>AZIMUTH</small>
+            <b class="readout amber" id="azValue">152.0°</b>
+            <span class="status" id="azStatus">● 偏离</span>
+          </div>
+          <canvas id="azScale" width="300" height="120"></canvas>
+          <div class="gain-block">
+            <div class="gain-head"><span>接收增益</span><b id="gainValue">55%</b></div>
+            <canvas id="gainMeter" width="300" height="34"></canvas>
+            <div class="mini-keys"><kbd>W</kbd> 增 <span></span><kbd>S</kbd> 减</div>
+          </div>
+          <div class="waterfall-head">
+            <span>左镜频谱</span><b id="leftWfHint">仰频 0%</b>
+          </div>
+          <canvas id="leftWaterfall" width="300" height="250"></canvas>
+          <p class="cross-note">仰角失谐会污染左镜读数</p>
+          <div class="panel-foot amber">A / D 调方位 · W / S 调增益</div>
+        </section>
+
+        <!-- 中：雷达与锁定 -->
+        <section class="panel panel-center">
+          <div class="panel-head">
+            <small>共享阵列 / 单雷达屏</small>
+            <span class="tag cyan" id="windowTag">● 双峰相干窗口</span>
+          </div>
+          <h3>异常信号捕获</h3>
+          <canvas id="radar" width="560" height="560"></canvas>
+          <div class="legend">
+            <span><i class="dot green"></i>双峰：真异常</span>
+            <span><i class="dot red"></i>单峰：诱饵回波</span>
+            <span><i class="cross"></i>当前波束</span>
+          </div>
+          <div class="lock-block">
+            <div class="lock-head">
+              <span id="lockTitle">双轴校正中</span><b id="targetLabel">异常 01</b>
+            </div>
+            <div class="lock-track"><i id="lockBar"></i></div>
+            <div class="lock-meta">
+              <span>AZ <b id="azErr">—</b></span>
+              <span id="lockTimer">0.00 / 2.00 s</span>
+              <span>EL <b id="elErr">—</b></span>
+            </div>
+          </div>
+          <div class="level-block">
+            <span>信号电平 <b id="levelDb">— dBm</b></span>
+            <canvas id="levelMeter" width="380" height="30"></canvas>
+            <small>LOCK ≥ 2.00 s</small>
+          </div>
+        </section>
+
+        <!-- 右：仰角台 -->
+        <section class="panel panel-right">
+          <div class="panel-head"><small>R / 02</small><span class="tag cyan">□ 右玩家</span></div>
+          <h3>仰角台</h3>
+          <p class="sub">共同状态 · 仰角轴</p>
+          <div class="readout-row">
+            <small>ELEVATION</small>
+            <b class="readout cyan" id="elValue">48.0°</b>
+            <span class="status" id="elStatus">● 容差内</span>
+          </div>
+          <canvas id="elGauge" width="300" height="140"></canvas>
+          <div class="band-block">
+            <div class="band-head"><span>滤波频段</span><b id="bandLabel">L-BAND</b></div>
+            <div class="band-buttons" id="bandButtons"></div>
+            <div class="mini-keys"><kbd>,</kbd> 左移频段 <span></span><kbd>.</kbd> 右移频段</div>
+          </div>
+          <div class="waterfall-head">
+            <span>右镜频谱</span><b id="rightWfHint">噪声 0%</b>
+          </div>
+          <canvas id="rightWaterfall" width="300" height="250"></canvas>
+          <p class="cross-note">方位失谐会污染右镜读数</p>
+          <div class="panel-foot cyan">↑ / ↓ 调仰角 · , / . 换频段</div>
+        </section>
+      </div>
+
+      <footer class="statusbar">
+        <div class="sb-locks">
+          异常锁定
+          <span id="lockPips"></span>
+          <span class="sb-sep">错误上限 <i id="wrongPips"></i></span>
+          <span class="sb-sep">风暴推力 <b id="windLabel">平稳 · 20%</b></span>
+        </div>
+        <div class="sb-center" id="windArrow">AZ+ EL+</div>
+        <div class="sb-right">
+          <span id="coopLabel">○ 双人同步输入 · 等待两侧操作</span>
+          <b id="holdLabel">两轴同时进入容差并保持 2.00 秒</b>
+        </div>
+      </footer>
+
+      <div id="feed" class="feed"></div>
+    </main>
+
+    <!-- 结算屏 -->
+    <section id="result" class="result hidden">
+      <div class="result-card" id="resultCard">
+        <small id="resultKicker">MISSION COMPLETE</small>
+        <h2 id="resultTitle">三个异常全部锁定</h2>
+        <p id="resultDesc"></p>
+        <div class="result-stats">
+          <div><small>锁定</small><b id="rsLocks">3 / 3</b></div>
+          <div><small>错锁</small><b id="rsWrong">0 / 2</b></div>
+          <div><small>剩余电量</small><b id="rsBattery">74%</b></div>
+          <div><small>双人协同</small><b id="rsCoop">5 次</b></div>
+        </div>
+        <div class="result-actions">
+          <button id="againBtn" class="primary-btn wide">再次布阵</button>
+          <button id="briefBtn" class="ghost-btn wide">返回简报</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

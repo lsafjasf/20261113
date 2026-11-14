@@ -1,0 +1,15 @@
+{
+  "name": "dual-mirror",
+  "version": "1.0.0",
+  "description": "双镜台：双人同屏合作射电望远镜小游戏",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/engine.test.js test/waterfall.test.js",
+    "test:e2e": "node test/browser.e2e.mjs",
+    "serve": "python3 -m http.server 8791"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.65.1"
+  }
+}
