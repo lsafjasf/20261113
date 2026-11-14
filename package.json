@@ -1,0 +1,17 @@
+{
+  "name": "wind-corridor-photography",
+  "version": "1.0.0",
+  "description": "风廊摄影：牵引挂相机的风筝穿越风带，拍摄三处山谷景观并安全收线。",
+  "private": true,
+  "scripts": {
+    "test": "node tests/headless.js && node tests/render-check.js && node tests/main-check.js",
+    "start": "node tests/static-server.js"
+  },
+  "keywords": [
+    "canvas2d",
+    "web-audio",
+    "game",
+    "physics"
+  ],
+  "license": "MIT"
+}

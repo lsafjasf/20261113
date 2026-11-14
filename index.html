@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>风廊摄影</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="game" width="960" height="600"></canvas>
+
+  <div id="hud">
+    <div class="hud-left">
+      <div class="hud-row"><span class="label">胶片</span><span id="film"></span></div>
+      <div class="hud-row"><span class="label">风筝</span>
+        <span class="bar"><i id="hp-bar"></i></span>
+      </div>
+      <div class="hud-row"><span class="label">时间</span><span id="timer">120</span></div>
+    </div>
+    <div class="hud-center"><div id="targets"></div></div>
+    <div class="hud-right">
+      <div class="hud-row"><span class="label">高度</span><span id="altitude">0</span> m</div>
+      <div class="hud-row"><span class="label">线长</span><span id="lineLen">0</span></div>
+      <div class="hud-row"><span class="label">风</span><span id="windCompass"></span></div>
+      <div class="hud-row"><span class="label">张紧</span>
+        <span class="bar small"><i id="tension-bar"></i></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="hint">A/D 摆线 · W/S 收放线 · 空格 快门 · P 暂停 · M 静音</div>
+
+  <div id="overlay">
+    <section class="panel" data-panel="menu">
+      <h1>风廊摄影</h1>
+      <p>牵引挂着相机的风筝穿越风廊，拍下三处山谷景观，再安全收线返航。</p>
+      <p class="dim">线太松会被风卷走，线绷太紧会损伤风筝甚至断线；你只有六张胶片。</p>
+      <button data-action="start">开始拍摄</button>
+    </section>
+
+    <section class="panel hidden" data-panel="pause">
+      <h2>已暂停</h2>
+      <button data-action="resume">继续</button>
+      <button data-action="restart">重新开始</button>
+    </section>
+
+    <section class="panel hidden" data-panel="lost">
+      <h2>任务失败</h2>
+      <p id="lostReason"></p>
+      <button data-action="restart">再来一次</button>
+    </section>
+
+    <section class="panel hidden" data-panel="won">
+      <h2>返航成功</h2>
+      <p id="wonStats"></p>
+      <button data-action="restart">再飞一次</button>
+    </section>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/rng.js"></script>
+<script src="js/world.js"></script>
+<script src="js/simulation.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
