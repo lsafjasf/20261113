@@ -1,0 +1,17 @@
+{
+  "name": "snowline-dispatch",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A snowy aerial tramway dispatch game.",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "node tests/browser.e2e.mjs",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "playwright": "^1.65.1"
+  }
+}
+

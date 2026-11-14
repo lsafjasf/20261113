@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="白脊索道：在风雪、结冰和电量限制下，调度两辆缆车送完八名乘客。"
+    />
+    <title>白脊索道 · 雪夜班次</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img">
+              <path d="M4 35 17 15l8 11 5-7 14 16H4Z" />
+              <path class="mark-wire" d="M3 12 45 8M11 8v9M37 8v7" />
+              <circle cx="23" cy="13" r="2.5" />
+            </svg>
+          </div>
+          <div class="brand-copy">
+            <span class="kicker">GLACIER TRANSIT / NIGHT 04</span>
+            <h1>白脊索道</h1>
+          </div>
+        </div>
+        <div class="top-meta">
+          <div class="live-state">
+            <span class="live-dot" id="liveDot"></span>
+            <span id="phaseLabel">等待调度</span>
+          </div>
+          <button class="seed-display" id="seedButton" type="button" title="生成新的校验 seed">
+            <span>SEED</span>
+            <code id="seedLabel">SNOW-2418</code>
+            <span class="seed-refresh" aria-hidden="true">↻</span>
+          </button>
+          <button class="icon-button" id="helpButton" type="button" aria-label="查看规则">?</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="stage" id="stage" aria-label="索道运行场景">
+          <canvas id="scene"></canvas>
+
+          <div class="stage-top">
+            <div class="run-clock">
+              <span class="run-label"><i></i><span id="runState">待发车</span></span>
+              <strong id="clockValue">00:00</strong>
+              <span id="clockSub">调度窗口 02:35</span>
+            </div>
+            <div class="weather-cluster">
+              <div class="weather-chip">
+                <span class="weather-icon wind-icon" aria-hidden="true">≋</span>
+                <span><small>实时风速</small><strong id="windValue">--</strong></span>
+              </div>
+              <div class="weather-chip">
+                <span class="weather-icon" aria-hidden="true">❄</span>
+                <span><small>冰面系数</small><strong id="iceValue">--</strong></span>
+              </div>
+              <div class="weather-chip temp-chip">
+                <span><small>气温</small><strong id="tempValue">--</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="corridor-label">
+            <span>548 m</span>
+            <i></i>
+            <span>单线索道</span>
+            <i></i>
+            <span>4 站</span>
+          </div>
+
+          <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+          <div class="stage-bottom">
+            <div class="forecast">
+              <span class="forecast-kicker">风况预报</span>
+              <span id="forecastText">阵风会拖慢吊厢，也拉长刹车距离。</span>
+            </div>
+            <div class="audio-visual" id="audioVisual" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side-panel">
+          <div class="side-scroll">
+            <section class="status-card">
+              <div class="card-title-row">
+                <div>
+                  <span class="section-kicker">SHIFT TELEMETRY</span>
+                  <h2>班次遥测</h2>
+                </div>
+                <span class="status-badge" id="statusBadge">待发车</span>
+              </div>
+              <div class="energy-head">
+                <span>电池余量</span>
+                <strong id="batteryValue">96<span>%</span></strong>
+              </div>
+              <div class="battery-track" aria-label="电池余量">
+                <i id="batteryFill"></i>
+                <em class="battery-floor" title="安全线 20%"></em>
+              </div>
+              <div class="energy-caption">
+                <span>保护线 20%</span>
+                <span id="batteryNote">电量充足</span>
+              </div>
+              <div class="telemetry-grid">
+                <div>
+                  <small>已送达</small>
+                  <strong id="deliveredValue">0 / 8</strong>
+                </div>
+                <div>
+                  <small>安全间距</small>
+                  <strong id="headwayValue">-- m</strong>
+                </div>
+                <div>
+                  <small>急停</small>
+                  <strong id="emergencyValue">0</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="dispatch-card">
+              <div class="card-title-row">
+                <div>
+                  <span class="section-kicker">DISPATCH PLAN</span>
+                  <h2>发车策略</h2>
+                </div>
+                <span class="verified-badge" id="verifiedBadge">SEED 已校验</span>
+              </div>
+
+              <div class="interval-block">
+                <div class="interval-copy">
+                  <label for="intervalInput">车辆发车间隔</label>
+                  <small>后车在 01 号离站后发车</small>
+                </div>
+                <strong class="interval-value" id="intervalValue">26<span>秒</span></strong>
+              </div>
+              <input
+                id="intervalInput"
+                class="interval-range"
+                type="range"
+                min="7"
+                max="36"
+                step="1"
+                value="26"
+                aria-label="车辆发车间隔"
+              />
+              <div class="range-labels">
+                <span>7s · 过密</span>
+                <span>36s · 稳妥</span>
+              </div>
+
+              <div class="stop-heading">
+                <span>沿途停靠</span>
+                <small>停站上下客，也消耗时间与电量</small>
+              </div>
+              <div class="stop-grid" id="stopGrid"></div>
+
+              <button class="launch-button" id="launchButton" type="button">
+                <span class="launch-icon" aria-hidden="true">▶</span>
+                <span>
+                  <strong>发车</strong>
+                  <small id="launchHint">01 号立即离站 · 02 号 26 秒后跟进</small>
+                </span>
+                <span class="launch-key">SPACE</span>
+              </button>
+            </section>
+
+            <section class="manifest-card">
+              <div class="card-title-row compact">
+                <div>
+                  <span class="section-kicker">PASSENGER MANIFEST</span>
+                  <h2>八名乘客</h2>
+                </div>
+                <span class="manifest-count" id="manifestCount">0 / 8</span>
+              </div>
+              <div class="manifest-list" id="passengerList"></div>
+            </section>
+
+            <section class="radio-card">
+              <div class="card-title-row compact">
+                <div>
+                  <span class="section-kicker">RADIO LOG</span>
+                  <h2>调度电台</h2>
+                </div>
+                <span class="radio-waves" aria-hidden="true"><i></i><i></i><i></i></span>
+              </div>
+              <div class="radio-log" id="radioLog">
+                <div class="log-entry neutral"><time>00:00</time><span>等待发车许可。</span></div>
+              </div>
+            </section>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="control-bar">
+        <div class="speed-group" aria-label="模拟速度">
+          <span>模拟速度</span>
+          <button type="button" data-speed="1">1×</button>
+          <button type="button" data-speed="2" class="active">2×</button>
+          <button type="button" data-speed="4">4×</button>
+        </div>
+        <div class="control-actions">
+          <button id="pauseButton" type="button" disabled><span>Ⅱ</span> 暂停</button>
+          <button id="audioButton" type="button"><span>◖</span> 声音 开</button>
+          <button id="restartButton" type="button"><span>↺</span> 重开</button>
+        </div>
+        <p class="footer-note">强风减速 · 结冰延距 · 电量低于 20% 即停机</p>
+      </footer>
+    </div>
+
+    <dialog class="result-dialog" id="resultDialog">
+      <div class="result-card">
+        <span class="result-eyebrow" id="resultEyebrow">SHIFT COMPLETE</span>
+        <div class="result-icon" id="resultIcon">✓</div>
+        <h2 id="resultTitle">班次完成</h2>
+        <p id="resultMessage">八名乘客全部抵达，双车完成全程。</p>
+        <div class="result-stats">
+          <div><span>送达</span><strong id="resultDelivered">8 / 8</strong></div>
+          <div><span>剩余电量</span><strong id="resultBattery">37%</strong></div>
+          <div><span>运行用时</span><strong id="resultTime">02:01</strong></div>
+          <div><span>急停次数</span><strong id="resultEmergency">0</strong></div>
+        </div>
+        <div class="result-actions">
+          <button class="secondary-button" id="adjustButton" type="button">调整策略</button>
+          <button class="primary-button" id="retryButton" type="button">再跑一班</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="help-dialog" id="helpDialog">
+      <div class="help-card">
+        <button class="dialog-close" id="closeHelpButton" type="button" aria-label="关闭">×</button>
+        <span class="result-eyebrow">OPERATIONS MANUAL</span>
+        <h2>雪夜调度规则</h2>
+        <div class="help-grid">
+          <article>
+            <span>01</span>
+            <h3>发车前排程</h3>
+            <p>01 号立即从松脊出发，02 号按所选间隔跟进。先在右侧设定发车间隔，并决定四站是否开门。</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>风与冰</h3>
+            <p>风速越高，吊厢巡航速度越低；冰面会降低制动效率，后车需要更长安全距离。</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>间距与电量</h3>
+            <p>后车逼近停站的前车会触发防撞急停，浪费七秒并额外耗电。电量跌破 20% 即任务失败。</p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>校验 seed</h3>
+            <p>每个 seed 都先模拟出一条可完成全程的基准行程，再据此生成八名乘客与耐心，不会出现无解需求。</p>
+          </article>
+        </div>
+        <button class="primary-button help-confirm" id="confirmHelpButton" type="button">知道了</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
+
