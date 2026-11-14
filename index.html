@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="三泵冷却回路共振抑制调校台：实时合成泵声，匹配带通滤波与反相耦合。"
+    />
+    <title>共振抑制台 · Resonance Abatement</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img">
+              <circle cx="24" cy="24" r="21"></circle>
+              <path d="M11 24h4l2.4-8 4.2 16 4.2-12 3.2 7 2.3-3H37"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="eyebrow">INDUSTRIAL ACOUSTICS · NODE 07</p>
+            <div class="brand-title">
+              <h1>共振抑制台</h1>
+              <span>RESONANCE ABATEMENT</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="top-controls">
+          <label class="seed-field" for="seedInput">
+            <span>SESSION SEED <i>/ 会话种子</i></span>
+            <input id="seedInput" type="number" min="1" max="999999" value="2419" />
+          </label>
+          <button class="seed-reset" id="restartSeed" type="button">重开同组</button>
+          <div class="armed" aria-live="polite">
+            <span class="status-dot"></span>
+            <span><b id="armedLabel">ARMED</b><small id="armedText">待机</small></span>
+          </div>
+        </div>
+      </header>
+
+      <section class="statusbar" aria-label="系统状态">
+        <div class="status-group">
+          <span><i class="mini-dot"></i>COOLANT LOOP 03 / ONLINE</span>
+          <span>SYNTH ENGINE · WEB AUDIO</span>
+          <span id="signatureText">SIGNATURE SG-C03A55</span>
+        </div>
+        <div class="status-actions">
+          <span class="elapsed" id="elapsedTime">00:00.0</span>
+          <button class="listen-button" id="listenButton" type="button" aria-pressed="false">
+            <span class="listen-icon" aria-hidden="true"></span>
+            <span id="listenLabel">启用监听</span>
+            <small>HEADPHONE REQUIRED</small>
+          </button>
+        </div>
+      </section>
+
+      <main class="workspace">
+        <aside class="left-rail">
+          <section class="panel mission-card">
+            <div class="hatch hatch-amber" aria-hidden="true"></div>
+            <div class="panel-head">
+              <div class="panel-kicker"><b>01</b> MISSION <i>/ 调校目标</i></div>
+              <span class="tag tag-live">ACTIVE</span>
+            </div>
+            <div class="mission-copy">
+              <h2>让三个共振频段<br />同时回到阈下。</h2>
+              <p>
+                三台冷却泵正在同一回路内叠振。仅凭频谱与听感匹配滤波器，不要尝试定位故障泵 —— 隔离逻辑已锁定。
+              </p>
+            </div>
+            <div class="mission-stats">
+              <div><b>03</b><span>频段</span></div>
+              <div><b>05.0</b><span>秒稳定窗</span></div>
+              <div><b id="rpmStat">5.1k</b><span>rpm 同步</span></div>
+            </div>
+          </section>
+
+          <section class="panel pump-card">
+            <div class="panel-head">
+              <div class="panel-kicker"><b>02</b> PUMP ARRAY <i>/ 泵组</i></div>
+              <span class="tag">3/3 RPM</span>
+            </div>
+            <div class="pump-list" id="pumpList">
+              <div class="pump-row" data-pump="0">
+                <span class="pump-id">P-01</span>
+                <canvas class="pump-wave" width="48" height="24" aria-hidden="true"></canvas>
+                <span class="pump-meta"><b class="pump-rpm">5100 RPM</b><small>64.2°C · 3.0 bar</small></span>
+                <i class="pump-led"></i>
+              </div>
+              <div class="pump-row" data-pump="1">
+                <span class="pump-id">P-02</span>
+                <canvas class="pump-wave" width="48" height="24" aria-hidden="true"></canvas>
+                <span class="pump-meta"><b class="pump-rpm">5107 RPM</b><small>64.6°C · 3.0 bar</small></span>
+                <i class="pump-led"></i>
+              </div>
+              <div class="pump-row" data-pump="2">
+                <span class="pump-id">P-03</span>
+                <canvas class="pump-wave" width="48" height="24" aria-hidden="true"></canvas>
+                <span class="pump-meta"><b class="pump-rpm">5114 RPM</b><small>65.0°C · 3.1 bar</small></span>
+                <i class="pump-led"></i>
+              </div>
+            </div>
+            <p class="sealed-note">
+              <span class="warning-icon">!</span>
+              故障源不可用 · SOURCE ID SEALED
+            </p>
+            <div class="phase-overlap">
+              <div class="overlap-gauge" aria-hidden="true"><span>ΔØ</span></div>
+              <div class="overlap-copy">
+                <span>PHASE OVERLAP / 重叠系数</span>
+                <strong id="overlapValue">0.842</strong>
+              </div>
+              <i class="overlap-led"></i>
+            </div>
+          </section>
+
+          <section class="panel protection-card">
+            <div class="panel-head">
+              <div class="panel-kicker"><b>03</b> PROTECTION <i>/ 保护系统</i></div>
+              <span class="tag" id="protectionTag">NOMINAL</span>
+            </div>
+            <div class="protection-body">
+              <div class="thermal-gauge" id="thermalGauge">
+                <div>
+                  <strong id="thermalValue">0.0</strong>
+                  <span>/ 24.0 s</span>
+                  <small>过载累计</small>
+                </div>
+              </div>
+              <div class="stable-readout">
+                <span>STABLE WINDOW / 稳定窗</span>
+                <strong id="stableValue">5.0</strong>
+                <div class="stable-bar"><i id="stableBar"></i></div>
+                <small>等待监听回零 · HEADPHONES</small>
+              </div>
+            </div>
+            <div class="protection-foot">
+              <span>TRIP LIMIT <b>24.0 S</b></span>
+              <span>PEAK <b id="peakLeak">100% LEAK</b></span>
+            </div>
+          </section>
+        </aside>
+
+        <section class="analysis-column">
+          <section class="panel scope-card">
+            <div class="panel-head">
+              <div class="panel-kicker"><b class="section-letter">A</b> TIME DOMAIN <i>/ 叠加波形</i></div>
+              <div class="head-readouts">
+                <span>COMPOSITE <b id="compositePeak">±0.82</b></span>
+                <span class="live-badge"><i></i>LIVE</span>
+              </div>
+            </div>
+            <div class="canvas-wrap scope-wrap">
+              <span class="canvas-note top-left" id="scopePeakLabel">PEAK 0.82</span>
+              <canvas id="scopeCanvas" aria-label="三泵叠加时域波形"></canvas>
+              <span class="canvas-note bottom-left">0 MS</span>
+              <span class="canvas-note bottom-center">WINDOW 80 MS</span>
+              <span class="canvas-note bottom-right">80 MS</span>
+            </div>
+          </section>
+
+          <section class="panel spectrum-card">
+            <div class="panel-head">
+              <div class="panel-kicker"><b class="section-letter">B</b> SPECTRUM <i>/ 实时频谱</i></div>
+              <div class="legend">
+                <span><i class="legend-signal"></i>SIGNAL</span>
+                <span><i class="legend-filter"></i>FILTER</span>
+                <span><i class="legend-limit"></i>LIMIT</span>
+              </div>
+            </div>
+            <div class="canvas-wrap spectrum-wrap">
+              <span class="db-label">-36</span>
+              <canvas id="spectrumCanvas" aria-label="实时频谱与滤波响应"></canvas>
+              <span class="limit-label">PEAK LIMIT</span>
+            </div>
+          </section>
+
+          <section class="panel history-card">
+            <div class="panel-head">
+              <div class="panel-kicker"><b class="section-letter">C</b> SPECTRAL HISTORY <i>/ 频谱瀑布</i></div>
+              <div class="head-readouts">
+                <span>ROLLING 20 S</span>
+                <span class="tag">SWEEP 12.5 HZ/DIV</span>
+              </div>
+            </div>
+            <div class="canvas-wrap history-wrap">
+              <canvas id="historyCanvas" aria-label="过去二十秒频谱瀑布"></canvas>
+            </div>
+          </section>
+        </section>
+
+        <aside class="signal-column">
+          <section class="panel signal-panel">
+            <div class="signal-heading">
+              <div>
+                <p class="eyebrow">SIGNAL CHAIN <i>/ 信号链</i></p>
+                <h2>有源滤波阵列</h2>
+              </div>
+              <span class="tag">MANUAL</span>
+            </div>
+            <div class="filter-stack" id="filterStack"></div>
+            <div class="phase-card">
+              <div class="phase-head">
+                <span>PHASE INJECTION / 相位注入</span>
+                <span class="tag tag-phase">Ø 3×</span>
+              </div>
+              <h3>反相耦合组</h3>
+              <div class="phase-knobs" id="phaseKnobs"></div>
+              <p>调节相位使各共振频率反相叠消，观察残余泄漏与瀑布亮度回落。</p>
+            </div>
+            <div class="signal-foot">
+              <span>BPF-01–03 · Ø 3× 锁定</span>
+              <span id="lockCount">0/3 锁频</span>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="footer-bar">
+        <span>REAL-TIME SYNTHESIS / NO RECORDINGS</span>
+        <span>THRESHOLD 30% · STABLE 5.0 S</span>
+        <span id="footerSeed">SEED 2419</span>
+      </footer>
+    </div>
+
+    <div class="modal-layer" id="modalLayer" aria-hidden="true">
+      <section class="result-modal" id="resultModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="result-hatch" id="resultHatch"></div>
+        <div class="result-content">
+          <p class="result-kicker" id="modalKicker">LOOP STABILIZED / 调校通过</p>
+          <h2 id="modalTitle">回路稳定</h2>
+          <p class="result-copy" id="modalCopy"></p>
+          <div class="result-stats">
+            <div><span>PEAK LEAK / 峰值残余</span><strong id="resultLeak">11%</strong></div>
+            <div><span>THERMAL DEBT / 过载累计</span><strong id="resultThermal">0.6 s</strong></div>
+            <div><span>ELAPSED / 用时</span><strong id="resultElapsed">00:05.6</strong></div>
+          </div>
+          <div class="result-actions">
+            <button class="primary-action" id="modalRestart" type="button">相同 SEED 再试一次</button>
+            <button class="secondary-action" id="modalClose" type="button">返回调校台</button>
+          </div>
+          <p class="result-note">按下重试会保留当前故障组合与频率/相位关系。</p>
+        </div>
+      </section>
+    </div>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
